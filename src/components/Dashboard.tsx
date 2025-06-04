@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,7 @@ import ExtractedItem from './ExtractedItem';
 import StateManager from './StateManager';
 import FileUploader from './FileUploader';
 import LiveRecorder from './LiveRecorder';
+import TextInput from './TextInput';
 import Settings from './Settings';
 import { useAppState } from '@/hooks/useAppState';
 import { extractItemsFromText, transcribeAudio } from '@/services/openaiService';
@@ -22,6 +23,7 @@ const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
   const [activeTab, setActiveTab] = useState('all');
   const [isProcessing, setIsProcessing] = useState(false);
   const [apiKey, setApiKey] = useState(localStorage.getItem('openai_api_key') || '');
+  const liveRecorderRef = useRef<any>(null);
   
   const {
     appState,
@@ -138,18 +140,39 @@ const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
       console.log('Transcribed text:', transcribedText);
       
       if (transcribedText && transcribedText.trim().length > 0) {
-        // Then extract items from the transcribed text
-        const extractedData = await extractItemsFromText(transcribedText, apiKey);
-        console.log('Extracted data:', extractedData);
-        
-        await addItemsFromExtractedData(extractedData, fileName, 'live-recording');
+        // Show the transcribed text to the user for editing
+        if (liveRecorderRef.current) {
+          liveRecorderRef.current.setTranscriptionResult(transcribedText);
+        }
       } else {
         alert('No text could be transcribed from the recording. Please try recording again with better audio quality.');
+        setIsProcessing(false);
       }
       
     } catch (error) {
       console.error('Error processing recorded audio with OpenAI:', error);
       alert('Error transcribing recorded audio. Please check your API key and try again.');
+      setIsProcessing(false);
+    }
+  };
+
+  const processTranscribedTextWithOpenAI = async (text: string, fileName: string) => {
+    if (!apiKey) {
+      alert('Please configure your OpenAI API key in Settings first.');
+      return;
+    }
+
+    setIsProcessing(true);
+    
+    try {
+      console.log('Processing transcribed text:', text.substring(0, 100) + '...');
+      const extractedData = await extractItemsFromText(text, apiKey);
+      console.log('Extracted data:', extractedData);
+      
+      await addItemsFromExtractedData(extractedData, fileName, 'live-recording');
+    } catch (error) {
+      console.error('Error processing transcribed text with OpenAI:', error);
+      alert('Error processing transcribed text. Please check your API key and try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -333,12 +356,17 @@ const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
       </div>
 
       {/* Input Methods */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <TextInput onTextProcessed={processTextWithOpenAI} />
         <FileUploader 
           onFileProcessed={processTextWithOpenAI} 
           onAudioProcessed={processAudioFileWithOpenAI}
         />
-        <LiveRecorder onRecordingProcessed={processAudioRecordingWithOpenAI} />
+        <LiveRecorder 
+          ref={liveRecorderRef}
+          onRecordingProcessed={processAudioRecordingWithOpenAI}
+          onTranscribedTextProcessed={processTranscribedTextWithOpenAI}
+        />
       </div>
 
       {/* State Management */}

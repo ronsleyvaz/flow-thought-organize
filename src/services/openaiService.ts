@@ -32,6 +32,8 @@ export const transcribeAudio = async (audioFile: File, apiKey: string): Promise<
   formData.append('model', 'whisper-1');
 
   try {
+    console.log('Sending audio to Whisper API, file size:', audioFile.size);
+    
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
@@ -41,11 +43,15 @@ export const transcribeAudio = async (audioFile: File, apiKey: string): Promise<
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI Whisper API error: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('Whisper API error response:', errorText);
+      throw new Error(`OpenAI Whisper API error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
-    return data.text;
+    console.log('Whisper API response:', data);
+    
+    return data.text || '';
   } catch (error) {
     console.error('Error transcribing audio:', error);
     throw error;
@@ -53,6 +59,11 @@ export const transcribeAudio = async (audioFile: File, apiKey: string): Promise<
 };
 
 export const extractItemsFromText = async (text: string, apiKey: string): Promise<ExtractedData> => {
+  if (!text || text.trim().length === 0) {
+    console.log('Empty text provided, returning empty data');
+    return { tasks: [], events: [], ideas: [], contacts: [] };
+  }
+
   const prompt = `Analyze the following transcript and extract actionable items. Return ONLY a valid JSON response with this exact structure:
 
 {
@@ -71,10 +82,13 @@ Rules:
 - Use YYYY-MM-DD format for dates
 - Return empty arrays if no items of that type are found
 - Do not include any text outside the JSON
+- Be liberal in extracting items - capture anything that could be actionable
 
 Transcript: ${text}`;
 
   try {
+    console.log('Sending text to ChatGPT for extraction, text length:', text.length);
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -94,29 +108,33 @@ Transcript: ${text}`;
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('ChatGPT API error response:', errorText);
+      throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
     const content = data.choices[0].message.content;
     
-    console.log('OpenAI response content:', content);
+    console.log('ChatGPT response content:', content);
     
     // Parse the JSON response
     const extractedData = JSON.parse(content);
     
     // Ensure all arrays exist with defaults
     const normalizedData: ExtractedData = {
-      tasks: extractedData.tasks || [],
-      events: extractedData.events || [],
-      ideas: extractedData.ideas || [],
-      contacts: extractedData.contacts || []
+      tasks: Array.isArray(extractedData.tasks) ? extractedData.tasks : [],
+      events: Array.isArray(extractedData.events) ? extractedData.events : [],
+      ideas: Array.isArray(extractedData.ideas) ? extractedData.ideas : [],
+      contacts: Array.isArray(extractedData.contacts) ? extractedData.contacts : []
     };
     
     console.log('Normalized extracted data:', normalizedData);
     return normalizedData;
   } catch (error) {
     console.error('Error extracting items:', error);
-    throw error;
+    
+    // Return empty data structure on error instead of throwing
+    return { tasks: [], events: [], ideas: [], contacts: [] };
   }
 };
