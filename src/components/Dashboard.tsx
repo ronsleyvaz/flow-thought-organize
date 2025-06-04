@@ -9,7 +9,9 @@ import ExtractedItem from './ExtractedItem';
 import StateManager from './StateManager';
 import FileUploader from './FileUploader';
 import LiveRecorder from './LiveRecorder';
+import Settings from './Settings';
 import { useAppState } from '@/hooks/useAppState';
+import { extractItemsFromText } from '@/services/openaiService';
 import { CheckSquare, Calendar, Lightbulb, User, FileText, TrendingUp } from 'lucide-react';
 
 interface DashboardProps {
@@ -18,7 +20,10 @@ interface DashboardProps {
 }
 
 const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
-  const [activeTab, setActiveTab] = useState(activeView || 'all');
+  const [activeTab, setActiveTab] = useState('all');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [apiKey, setApiKey] = useState(localStorage.getItem('openai_api_key') || '');
+  
   const {
     appState,
     exportState,
@@ -62,47 +67,177 @@ const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
     type: metadata.type,
   }));
 
-  // Handle file processing
-  const handleFileProcessed = (file: File) => {
-    // Simulate processing and extract sample items
-    const transcriptId = addProcessedTranscript({
-      name: file.name.replace(/\.[^/.]+$/, ""),
-      duration: "Unknown",
-      type: 'meeting',
-      extractedItemCount: 3,
-      processingConfidence: 85,
-    });
+  const processTextWithOpenAI = async (text: string, fileName: string) => {
+    if (!apiKey) {
+      alert('Please configure your OpenAI API key in Settings first.');
+      return;
+    }
 
-    // Add some sample extracted items
-    const sampleItems = [
-      {
-        type: 'task' as const,
-        title: `Follow up on discussion from ${file.name}`,
-        description: 'Schedule meeting to discuss next steps',
-        category: 'Business' as const,
-        priority: 'high' as const,
-        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-        confidence: 88,
-        approved: false,
-        sourceTranscriptId: transcriptId,
-      },
-      {
-        type: 'idea' as const,
-        title: `New concept from ${file.name}`,
-        description: 'Explore this innovative approach further',
-        category: 'Projects' as const,
-        priority: 'medium' as const,
-        confidence: 76,
-        approved: false,
-        sourceTranscriptId: transcriptId,
-      }
-    ];
+    setIsProcessing(true);
+    
+    try {
+      const extractedData = await extractItemsFromText(text, apiKey);
+      
+      // Add transcript metadata
+      const transcriptId = addProcessedTranscript({
+        name: fileName.replace(/\.[^/.]+$/, ""),
+        duration: "Unknown",
+        type: 'meeting',
+        extractedItemCount: extractedData.tasks.length + extractedData.events.length + extractedData.ideas.length + extractedData.contacts.length,
+        processingConfidence: 85,
+      });
 
-    addExtractedItems(sampleItems);
+      // Convert extracted data to our format
+      const extractedItems = [
+        ...extractedData.tasks.map(task => ({
+          type: 'task' as const,
+          title: task.title,
+          description: task.description,
+          category: 'Business' as const,
+          priority: task.priority,
+          dueDate: task.dueDate,
+          assignee: task.assignee,
+          confidence: 85,
+          approved: false,
+          sourceTranscriptId: transcriptId,
+        })),
+        ...extractedData.events.map(event => ({
+          type: 'event' as const,
+          title: event.title,
+          description: event.description,
+          category: 'Business' as const,
+          priority: 'medium' as const,
+          dueDate: event.date,
+          confidence: 85,
+          approved: false,
+          sourceTranscriptId: transcriptId,
+        })),
+        ...extractedData.ideas.map(idea => ({
+          type: 'idea' as const,
+          title: idea.title,
+          description: idea.description,
+          category: 'Projects' as const,
+          priority: 'medium' as const,
+          confidence: 85,
+          approved: false,
+          sourceTranscriptId: transcriptId,
+        })),
+        ...extractedData.contacts.map(contact => ({
+          type: 'contact' as const,
+          title: contact.name,
+          description: `${contact.role || ''} ${contact.company ? `at ${contact.company}` : ''} ${contact.email || ''} ${contact.phone || ''}`.trim(),
+          category: 'Business' as const,
+          priority: 'low' as const,
+          confidence: 85,
+          approved: false,
+          sourceTranscriptId: transcriptId,
+        }))
+      ];
+
+      addExtractedItems(extractedItems);
+    } catch (error) {
+      console.error('Error processing with OpenAI:', error);
+      alert('Error processing transcript. Please check your API key and try again.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
+  // Show settings view
+  if (activeView === 'settings') {
+    return <Settings onApiKeyChange={setApiKey} />;
+  }
+
+  // Show specific view content
+  if (activeView === 'transcripts') {
+    return (
+      <div className="p-6 space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <FileText className="h-5 w-5 mr-2" />
+              Recent Transcripts
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {recentTranscripts.length > 0 ? (
+              recentTranscripts.map((transcript) => (
+                <ProcessingCard key={transcript.id} transcript={transcript} />
+              ))
+            ) : (
+              <p className="text-gray-500 text-center py-4">
+                No transcripts processed yet. Upload or record to get started.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (activeView === 'task' || activeView === 'event' || activeView === 'idea' || activeView === 'contact') {
+    const items = getItemsByType(activeView);
+    return (
+      <div className="p-6 space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center capitalize">
+              {activeView === 'task' && <CheckSquare className="h-5 w-5 mr-2" />}
+              {activeView === 'event' && <Calendar className="h-5 w-5 mr-2" />}
+              {activeView === 'idea' && <Lightbulb className="h-5 w-5 mr-2" />}
+              {activeView === 'contact' && <User className="h-5 w-5 mr-2" />}
+              {activeView}s
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {items.length > 0 ? (
+              items.map((item) => (
+                <ExtractedItem
+                  key={item.id}
+                  item={item}
+                  onToggleApproval={toggleItemApproval}
+                  onEdit={editExtractedItem}
+                  onDelete={deleteExtractedItem}
+                />
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>No {activeView}s found</p>
+                <p className="text-sm">Process a transcript to see extracted items here</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Default dashboard view
   return (
     <div className="p-6 space-y-6">
+      {/* API Key Warning */}
+      {!apiKey && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardContent className="p-4">
+            <p className="text-yellow-800 text-sm">
+              Please configure your OpenAI API key in Settings to enable transcript processing.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Processing Indicator */}
+      {isProcessing && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <div className="animate-spin h-4 w-4 border-b-2 border-blue-600 rounded-full"></div>
+              <p className="text-blue-800 text-sm">Processing transcript with OpenAI...</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {stats.map((stat) => (
@@ -122,8 +257,8 @@ const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
 
       {/* Input Methods */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <FileUploader onFileProcessed={handleFileProcessed} />
-        <LiveRecorder onRecordingProcessed={handleFileProcessed} />
+        <FileUploader onFileProcessed={processTextWithOpenAI} />
+        <LiveRecorder onRecordingProcessed={processTextWithOpenAI} />
       </div>
 
       {/* State Management */}

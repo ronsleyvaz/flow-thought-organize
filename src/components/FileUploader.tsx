@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 interface FileUploaderProps {
-  onFileProcessed: (file: File) => void;
+  onFileProcessed: (text: string, fileName: string) => void;
 }
 
 const FileUploader = ({ onFileProcessed }: FileUploaderProps) => {
@@ -29,12 +29,34 @@ const FileUploader = ({ onFileProcessed }: FileUploaderProps) => {
   const processFile = async (file: File) => {
     setIsProcessing(true);
     
-    // Simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    onFileProcessed(file);
-    setLastProcessed(file.name);
-    setIsProcessing(false);
+    try {
+      let text = '';
+      
+      if (file.type === 'text/plain') {
+        // Read text file
+        text = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.onerror = reject;
+          reader.readAsText(file);
+        });
+      } else if (file.type.startsWith('audio/')) {
+        // For audio files, we'd normally send to a transcription service
+        // For now, we'll simulate with mock transcription
+        text = `Audio transcription from ${file.name}: This is a sample transcription of the uploaded audio file. 
+        I need to review the quarterly budget with the finance team by next Wednesday. 
+        Schedule a client demo for Acme Corp next Friday at 2 PM. 
+        New project idea: implement automated reporting dashboard.
+        Contact: Sarah Johnson from Marketing, sarah@company.com.`;
+      }
+      
+      onFileProcessed(text, file.name);
+      setLastProcessed(file.name);
+    } catch (error) {
+      console.error('Error processing file:', error);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {

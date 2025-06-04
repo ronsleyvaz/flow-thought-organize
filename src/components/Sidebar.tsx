@@ -1,5 +1,5 @@
 
-import { FileText, CheckSquare, Calendar, Lightbulb, Users, Home, Briefcase, FolderOpen } from 'lucide-react';
+import { FileText, CheckSquare, Calendar, Lightbulb, Users, Home, Briefcase, FolderOpen, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SidebarProps {
@@ -17,6 +17,7 @@ const Sidebar = ({ activeView = 'dashboard', activeCategory, onViewChange, onCat
     { name: 'Calendar Events', key: 'event', icon: Calendar },
     { name: 'Ideas', key: 'idea', icon: Lightbulb },
     { name: 'Contacts', key: 'contact', icon: Users },
+    { name: 'Settings', key: 'settings', icon: Settings },
   ];
 
   const categories = [
@@ -52,33 +53,35 @@ const Sidebar = ({ activeView = 'dashboard', activeCategory, onViewChange, onCat
         ))}
       </nav>
 
-      <div className="mt-8">
-        <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-          Categories
-        </h3>
-        <div className="mt-3 space-y-2">
-          {categories.map((category) => (
-            <button
-              key={category.key}
-              onClick={() => onCategoryChange?.(category.key)}
-              className={cn(
-                "flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors w-full text-left",
-                activeCategory === category.key
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-gray-700 hover:bg-gray-100'
-              )}
-            >
-              <div className="flex items-center">
-                <category.icon className="mr-3 h-4 w-4 text-gray-400" />
-                {category.name}
-              </div>
-              <span className={cn(category.color, 'px-2 py-1 text-xs font-medium rounded-full')}>
-                {category.count}
-              </span>
-            </button>
-          ))}
+      {activeView !== 'settings' && (
+        <div className="mt-8">
+          <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            Categories
+          </h3>
+          <div className="mt-3 space-y-2">
+            {categories.map((category) => (
+              <button
+                key={category.key}
+                onClick={() => onCategoryChange?.(category.key)}
+                className={cn(
+                  "flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors w-full text-left",
+                  activeCategory === category.key
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-gray-700 hover:bg-gray-100'
+                )}
+              >
+                <div className="flex items-center">
+                  <category.icon className="mr-3 h-4 w-4 text-gray-400" />
+                  {category.name}
+                </div>
+                <span className={cn(category.color, 'px-2 py-1 text-xs font-medium rounded-full')}>
+                  {category.count}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </aside>
   );
 };
