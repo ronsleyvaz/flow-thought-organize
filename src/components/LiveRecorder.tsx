@@ -111,9 +111,16 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
     setIsTranscribing(true);
     
     try {
+      console.log('Starting transcription process...');
       const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+      console.log('Audio blob created:', audioBlob.size, 'bytes');
+      
       const fileName = `recording-${Date.now()}.webm`;
       currentFileNameRef.current = fileName;
+      
+      // Create a File object for the transcription
+      const audioFile = new File([audioBlob], fileName, { type: 'audio/webm' });
+      console.log('Audio file created for transcription');
       
       // Call the transcription function passed from parent
       onRecordingProcessed(audioBlob, fileName);
@@ -121,6 +128,7 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
       setHasRecording(false);
     } catch (error) {
       console.error('Error processing recording:', error);
+      alert('Failed to process recording. Please try again.');
     } finally {
       setIsTranscribing(false);
     }
