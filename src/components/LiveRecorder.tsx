@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import { Mic, MicOff, Square, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 interface LiveRecorderProps {
-  onRecordingProcessed: (transcriptionText: string, fileName: string) => void;
+  onRecordingProcessed: (audioBlob: Blob, fileName: string) => void;
 }
 
 const LiveRecorder = ({ onRecordingProcessed }: LiveRecorderProps) => {
@@ -19,11 +18,23 @@ const LiveRecorder = ({ onRecordingProcessed }: LiveRecorderProps) => {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          sampleRate: 44100,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true
+        }
+      });
+      
+      streamRef.current = stream;
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus'
+      });
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
@@ -34,14 +45,16 @@ const LiveRecorder = ({ onRecordingProcessed }: LiveRecorderProps) => {
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(chunksRef.current, { type: 'audio/wav' });
+        const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
         setHasRecording(true);
         
         // Stop all tracks to release microphone
-        stream.getTracks().forEach(track => track.stop());
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+        }
       };
 
-      mediaRecorder.start();
+      mediaRecorder.start(1000); // Collect data every second
       setIsRecording(true);
       setIsPaused(false);
       setRecordingTime(0);
@@ -51,12 +64,12 @@ const LiveRecorder = ({ onRecordingProcessed }: LiveRecorderProps) => {
       }, 1000);
     } catch (error) {
       console.error('Error accessing microphone:', error);
-      alert('Could not access microphone. Please check permissions.');
+      alert('Could not access microphone. Please check permissions and ensure you\'re using HTTPS.');
     }
   };
 
   const pauseRecording = () => {
-    if (mediaRecorderRef.current) {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       if (isPaused) {
         mediaRecorderRef.current.resume();
         intervalRef.current = setInterval(() => {
@@ -73,8 +86,11 @@ const LiveRecorder = ({ onRecordingProcessed }: LiveRecorderProps) => {
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current) {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
     }
     setIsRecording(false);
     setIsPaused(false);
@@ -87,15 +103,10 @@ const LiveRecorder = ({ onRecordingProcessed }: LiveRecorderProps) => {
     setIsProcessing(true);
     
     try {
-      // Create a mock transcription for now since we don't have a transcription service
-      // In a real app, you'd send the audio to a transcription service
-      const mockTranscription = `Recording from ${new Date().toLocaleString()}: This is a sample transcription. 
-      I need to follow up with John about the project deadline next Friday. 
-      Also, remember to schedule a meeting with the design team for brainstorming session. 
-      New idea: implement dark mode for the application.`;
+      const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+      const fileName = `recording-${Date.now()}.webm`;
       
-      const fileName = `recording-${Date.now()}.wav`;
-      onRecordingProcessed(mockTranscription, fileName);
+      onRecordingProcessed(audioBlob, fileName);
       
       setHasRecording(false);
       setRecordingTime(0);

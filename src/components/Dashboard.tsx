@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,7 +10,7 @@ import FileUploader from './FileUploader';
 import LiveRecorder from './LiveRecorder';
 import Settings from './Settings';
 import { useAppState } from '@/hooks/useAppState';
-import { extractItemsFromText } from '@/services/openaiService';
+import { extractItemsFromText, transcribeAudio } from '@/services/openaiService';
 import { CheckSquare, Calendar, Lightbulb, User, FileText, TrendingUp } from 'lucide-react';
 
 interface DashboardProps {
@@ -38,12 +37,10 @@ const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
 
   const { transcriptMetadata, extractedItems } = appState;
 
-  // Filter items by category if specified
   const filteredItems = activeCategory && activeCategory !== 'all' 
     ? extractedItems.filter(item => item.category.toLowerCase() === activeCategory.toLowerCase())
     : extractedItems;
 
-  // Filter items by type for tabs
   const getItemsByType = (type: string) => {
     const baseItems = filteredItems;
     if (type === 'all') return baseItems;
@@ -76,20 +73,28 @@ const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
     setIsProcessing(true);
     
     try {
+      console.log('Processing text:', text.substring(0, 100) + '...');
       const extractedData = await extractItemsFromText(text, apiKey);
+      console.log('Extracted data:', extractedData);
+      
+      // Calculate total items
+      const totalItems = (extractedData.tasks?.length || 0) + 
+                        (extractedData.events?.length || 0) + 
+                        (extractedData.ideas?.length || 0) + 
+                        (extractedData.contacts?.length || 0);
       
       // Add transcript metadata
       const transcriptId = addProcessedTranscript({
         name: fileName.replace(/\.[^/.]+$/, ""),
         duration: "Unknown",
         type: 'meeting',
-        extractedItemCount: extractedData.tasks.length + extractedData.events.length + extractedData.ideas.length + extractedData.contacts.length,
+        extractedItemCount: totalItems,
         processingConfidence: 85,
       });
 
       // Convert extracted data to our format
       const extractedItems = [
-        ...extractedData.tasks.map(task => ({
+        ...(extractedData.tasks || []).map(task => ({
           type: 'task' as const,
           title: task.title,
           description: task.description,
@@ -101,7 +106,7 @@ const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
           approved: false,
           sourceTranscriptId: transcriptId,
         })),
-        ...extractedData.events.map(event => ({
+        ...(extractedData.events || []).map(event => ({
           type: 'event' as const,
           title: event.title,
           description: event.description,
@@ -112,7 +117,7 @@ const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
           approved: false,
           sourceTranscriptId: transcriptId,
         })),
-        ...extractedData.ideas.map(idea => ({
+        ...(extractedData.ideas || []).map(idea => ({
           type: 'idea' as const,
           title: idea.title,
           description: idea.description,
@@ -122,7 +127,7 @@ const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
           approved: false,
           sourceTranscriptId: transcriptId,
         })),
-        ...extractedData.contacts.map(contact => ({
+        ...(extractedData.contacts || []).map(contact => ({
           type: 'contact' as const,
           title: contact.name,
           description: `${contact.role || ''} ${contact.company ? `at ${contact.company}` : ''} ${contact.email || ''} ${contact.phone || ''}`.trim(),
@@ -134,6 +139,7 @@ const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
         }))
       ];
 
+      console.log('Adding extracted items:', extractedItems);
       addExtractedItems(extractedItems);
     } catch (error) {
       console.error('Error processing with OpenAI:', error);
@@ -143,12 +149,39 @@ const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
     }
   };
 
-  // Show settings view
+  const processAudioWithOpenAI = async (audioBlob: Blob, fileName: string) => {
+    if (!apiKey) {
+      alert('Please configure your OpenAI API key in Settings first.');
+      return;
+    }
+
+    setIsProcessing(true);
+    
+    try {
+      console.log('Transcribing audio with Whisper...');
+      
+      // Convert blob to file for Whisper API
+      const audioFile = new File([audioBlob], fileName, { type: audioBlob.type });
+      
+      // First transcribe the audio
+      const transcribedText = await transcribeAudio(audioFile, apiKey);
+      console.log('Transcribed text:', transcribedText);
+      
+      // Then extract items from the transcribed text
+      await processTextWithOpenAI(transcribedText, fileName);
+      
+    } catch (error) {
+      console.error('Error processing audio with OpenAI:', error);
+      alert('Error transcribing audio. Please check your API key and try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   if (activeView === 'settings') {
     return <Settings onApiKeyChange={setApiKey} />;
   }
 
-  // Show specific view content
   if (activeView === 'transcripts') {
     return (
       <div className="p-6 space-y-6">
@@ -232,7 +265,7 @@ const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
               <div className="animate-spin h-4 w-4 border-b-2 border-blue-600 rounded-full"></div>
-              <p className="text-blue-800 text-sm">Processing transcript with OpenAI...</p>
+              <p className="text-blue-800 text-sm">Processing with OpenAI...</p>
             </div>
           </CardContent>
         </Card>
@@ -258,7 +291,7 @@ const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
       {/* Input Methods */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <FileUploader onFileProcessed={processTextWithOpenAI} />
-        <LiveRecorder onRecordingProcessed={processTextWithOpenAI} />
+        <LiveRecorder onRecordingProcessed={processAudioWithOpenAI} />
       </div>
 
       {/* State Management */}

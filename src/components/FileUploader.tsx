@@ -1,4 +1,3 @@
-
 import { useRef, useState } from 'react';
 import { Upload, FileText, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -41,17 +40,18 @@ const FileUploader = ({ onFileProcessed }: FileUploaderProps) => {
           reader.readAsText(file);
         });
       } else if (file.type.startsWith('audio/')) {
-        // For audio files, we'd normally send to a transcription service
-        // For now, we'll simulate with mock transcription
-        text = `Audio transcription from ${file.name}: This is a sample transcription of the uploaded audio file. 
-        I need to review the quarterly budget with the finance team by next Wednesday. 
-        Schedule a client demo for Acme Corp next Friday at 2 PM. 
-        New project idea: implement automated reporting dashboard.
-        Contact: Sarah Johnson from Marketing, sarah@company.com.`;
+        // For audio files, we'll pass the file itself to the parent
+        // The parent will handle Whisper transcription
+        console.log('Audio file detected, will be transcribed by OpenAI Whisper');
+        onFileProcessed('', file.name); // Pass empty text, file will be handled by parent
+        setLastProcessed(file.name);
+        return;
       }
       
-      onFileProcessed(text, file.name);
-      setLastProcessed(file.name);
+      if (text) {
+        onFileProcessed(text, file.name);
+        setLastProcessed(file.name);
+      }
     } catch (error) {
       console.error('Error processing file:', error);
     } finally {
@@ -89,7 +89,7 @@ const FileUploader = ({ onFileProcessed }: FileUploaderProps) => {
           {isProcessing ? (
             <div className="space-y-2">
               <div className="animate-spin h-8 w-8 border-b-2 border-blue-600 rounded-full mx-auto"></div>
-              <p className="text-sm text-gray-600">Processing transcript...</p>
+              <p className="text-sm text-gray-600">Processing file...</p>
             </div>
           ) : (
             <div className="space-y-2">
