@@ -1,8 +1,12 @@
-import { CheckSquare, Calendar, Lightbulb, User, Clock, Flag, FileText } from 'lucide-react';
+
+import { useState } from 'react';
+import { CheckSquare, Calendar, Lightbulb, User, Clock, Flag, FileText, Edit2, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
 interface ExtractedItemProps {
@@ -21,9 +25,14 @@ interface ExtractedItemProps {
     extractedAt?: string;
   };
   onToggleApproval: (id: string) => void;
+  onEdit?: (id: string, updates: Partial<ExtractedItemProps['item']>) => void;
+  onDelete?: (id: string) => void;
 }
 
-const ExtractedItem = ({ item, onToggleApproval }: ExtractedItemProps) => {
+const ExtractedItem = ({ item, onToggleApproval, onEdit, onDelete }: ExtractedItemProps) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedItem, setEditedItem] = useState(item);
+
   const getTypeIcon = () => {
     switch (item.type) {
       case 'task':
@@ -74,6 +83,22 @@ const ExtractedItem = ({ item, onToggleApproval }: ExtractedItemProps) => {
     }
   };
 
+  const handleSave = () => {
+    onEdit?.(item.id, editedItem);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditedItem(item);
+    setIsEditing(false);
+  };
+
+  const handleDelete = () => {
+    if (window.confirm('Are you sure you want to delete this item?')) {
+      onDelete?.(item.id);
+    }
+  };
+
   return (
     <Card className={cn(
       "transition-all duration-200",
@@ -106,10 +131,33 @@ const ExtractedItem = ({ item, onToggleApproval }: ExtractedItemProps) => {
               </Badge>
             </div>
             
-            <h3 className="font-medium text-gray-900">{item.title}</h3>
-            
-            {item.description && (
-              <p className="text-sm text-gray-600">{item.description}</p>
+            {isEditing ? (
+              <div className="space-y-2">
+                <Input
+                  value={editedItem.title}
+                  onChange={(e) => setEditedItem({...editedItem, title: e.target.value})}
+                  className="font-medium"
+                />
+                {editedItem.description && (
+                  <Textarea
+                    value={editedItem.description}
+                    onChange={(e) => setEditedItem({...editedItem, description: e.target.value})}
+                    className="text-sm"
+                    rows={2}
+                  />
+                )}
+                <div className="flex space-x-2">
+                  <Button size="sm" onClick={handleSave}>Save</Button>
+                  <Button size="sm" variant="outline" onClick={handleCancel}>Cancel</Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <h3 className="font-medium text-gray-900">{item.title}</h3>
+                {item.description && (
+                  <p className="text-sm text-gray-600">{item.description}</p>
+                )}
+              </>
             )}
             
             <div className="flex items-center space-x-4 text-xs text-gray-500">
@@ -134,10 +182,16 @@ const ExtractedItem = ({ item, onToggleApproval }: ExtractedItemProps) => {
             </div>
           </div>
           
-          <div className="flex space-x-1">
-            <Button variant="ghost" size="sm">Edit</Button>
-            <Button variant="ghost" size="sm">Delete</Button>
-          </div>
+          {!isEditing && (
+            <div className="flex space-x-1">
+              <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)}>
+                <Edit2 className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleDelete} className="text-red-600 hover:text-red-700">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

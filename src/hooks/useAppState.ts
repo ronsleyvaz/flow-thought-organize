@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 
 export interface TranscriptMetadata {
@@ -185,6 +184,22 @@ export const useAppState = () => {
     });
   };
 
+  const editExtractedItem = (id: string, updates: Partial<ExtractedItem>) => {
+    setAppState(prev => ({
+      ...prev,
+      extractedItems: prev.extractedItems.map(item =>
+        item.id === id ? { ...item, ...updates } : item
+      ),
+    }));
+  };
+
+  const deleteExtractedItem = (id: string) => {
+    setAppState(prev => ({
+      ...prev,
+      extractedItems: prev.extractedItems.filter(item => item.id !== id),
+    }));
+  };
+
   return {
     appState,
     exportState,
@@ -192,6 +207,8 @@ export const useAppState = () => {
     addProcessedTranscript,
     addExtractedItems,
     toggleItemApproval,
+    editExtractedItem,
+    deleteExtractedItem,
     clearAllData,
   };
 };
