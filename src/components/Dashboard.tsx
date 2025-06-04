@@ -77,70 +77,7 @@ const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
       const extractedData = await extractItemsFromText(text, apiKey);
       console.log('Extracted data:', extractedData);
       
-      // Calculate total items
-      const totalItems = (extractedData.tasks?.length || 0) + 
-                        (extractedData.events?.length || 0) + 
-                        (extractedData.ideas?.length || 0) + 
-                        (extractedData.contacts?.length || 0);
-      
-      // Add transcript metadata
-      const transcriptId = addProcessedTranscript({
-        name: fileName.replace(/\.[^/.]+$/, ""),
-        duration: "Unknown",
-        type: 'meeting',
-        extractedItemCount: totalItems,
-        processingConfidence: 85,
-      });
-
-      // Convert extracted data to our format
-      const extractedItems = [
-        ...(extractedData.tasks || []).map(task => ({
-          type: 'task' as const,
-          title: task.title,
-          description: task.description,
-          category: 'Business' as const,
-          priority: task.priority,
-          dueDate: task.dueDate,
-          assignee: task.assignee,
-          confidence: 85,
-          approved: false,
-          sourceTranscriptId: transcriptId,
-        })),
-        ...(extractedData.events || []).map(event => ({
-          type: 'event' as const,
-          title: event.title,
-          description: event.description,
-          category: 'Business' as const,
-          priority: 'medium' as const,
-          dueDate: event.date,
-          confidence: 85,
-          approved: false,
-          sourceTranscriptId: transcriptId,
-        })),
-        ...(extractedData.ideas || []).map(idea => ({
-          type: 'idea' as const,
-          title: idea.title,
-          description: idea.description,
-          category: 'Projects' as const,
-          priority: 'medium' as const,
-          confidence: 85,
-          approved: false,
-          sourceTranscriptId: transcriptId,
-        })),
-        ...(extractedData.contacts || []).map(contact => ({
-          type: 'contact' as const,
-          title: contact.name,
-          description: `${contact.role || ''} ${contact.company ? `at ${contact.company}` : ''} ${contact.email || ''} ${contact.phone || ''}`.trim(),
-          category: 'Business' as const,
-          priority: 'low' as const,
-          confidence: 85,
-          approved: false,
-          sourceTranscriptId: transcriptId,
-        }))
-      ];
-
-      console.log('Adding extracted items:', extractedItems);
-      addExtractedItems(extractedItems);
+      await addItemsFromExtractedData(extractedData, fileName, 'text');
     } catch (error) {
       console.error('Error processing with OpenAI:', error);
       alert('Error processing transcript. Please check your API key and try again.');
@@ -149,7 +86,7 @@ const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
     }
   };
 
-  const processAudioWithOpenAI = async (audioBlob: Blob, fileName: string) => {
+  const processAudioFileWithOpenAI = async (audioFile: File, fileName: string) => {
     if (!apiKey) {
       alert('Please configure your OpenAI API key in Settings first.');
       return;
@@ -158,7 +95,40 @@ const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
     setIsProcessing(true);
     
     try {
-      console.log('Transcribing audio with Whisper...');
+      console.log('Transcribing audio file with Whisper:', fileName);
+      
+      // First transcribe the audio
+      const transcribedText = await transcribeAudio(audioFile, apiKey);
+      console.log('Transcribed text:', transcribedText);
+      
+      if (transcribedText && transcribedText.trim().length > 0) {
+        // Then extract items from the transcribed text
+        const extractedData = await extractItemsFromText(transcribedText, apiKey);
+        console.log('Extracted data:', extractedData);
+        
+        await addItemsFromExtractedData(extractedData, fileName, 'audio-file');
+      } else {
+        alert('No text could be transcribed from the audio file. Please check the audio quality.');
+      }
+      
+    } catch (error) {
+      console.error('Error processing audio file with OpenAI:', error);
+      alert('Error transcribing audio file. Please check your API key and try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const processAudioRecordingWithOpenAI = async (audioBlob: Blob, fileName: string) => {
+    if (!apiKey) {
+      alert('Please configure your OpenAI API key in Settings first.');
+      return;
+    }
+
+    setIsProcessing(true);
+    
+    try {
+      console.log('Transcribing recorded audio with Whisper...');
       
       // Convert blob to file for Whisper API
       const audioFile = new File([audioBlob], fileName, { type: audioBlob.type });
@@ -167,15 +137,89 @@ const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
       const transcribedText = await transcribeAudio(audioFile, apiKey);
       console.log('Transcribed text:', transcribedText);
       
-      // Then extract items from the transcribed text
-      await processTextWithOpenAI(transcribedText, fileName);
+      if (transcribedText && transcribedText.trim().length > 0) {
+        // Then extract items from the transcribed text
+        const extractedData = await extractItemsFromText(transcribedText, apiKey);
+        console.log('Extracted data:', extractedData);
+        
+        await addItemsFromExtractedData(extractedData, fileName, 'live-recording');
+      } else {
+        alert('No text could be transcribed from the recording. Please try recording again with better audio quality.');
+      }
       
     } catch (error) {
-      console.error('Error processing audio with OpenAI:', error);
-      alert('Error transcribing audio. Please check your API key and try again.');
+      console.error('Error processing recorded audio with OpenAI:', error);
+      alert('Error transcribing recorded audio. Please check your API key and try again.');
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const addItemsFromExtractedData = async (extractedData: any, fileName: string, sourceType: string) => {
+    // Calculate total items
+    const totalItems = (extractedData.tasks?.length || 0) + 
+                      (extractedData.events?.length || 0) + 
+                      (extractedData.ideas?.length || 0) + 
+                      (extractedData.contacts?.length || 0);
+    
+    // Add transcript metadata
+    const transcriptId = addProcessedTranscript({
+      name: fileName.replace(/\.[^/.]+$/, ""),
+      duration: sourceType === 'text' ? "N/A" : "Unknown",
+      type: sourceType === 'live-recording' ? 'voice-memo' : 'meeting',
+      extractedItemCount: totalItems,
+      processingConfidence: 85,
+    });
+
+    // Convert extracted data to our format
+    const extractedItems = [
+      ...(extractedData.tasks || []).map((task: any) => ({
+        type: 'task' as const,
+        title: task.title,
+        description: task.description,
+        category: 'Business' as const,
+        priority: task.priority,
+        dueDate: task.dueDate,
+        assignee: task.assignee,
+        confidence: 85,
+        approved: false,
+        sourceTranscriptId: transcriptId,
+      })),
+      ...(extractedData.events || []).map((event: any) => ({
+        type: 'event' as const,
+        title: event.title,
+        description: event.description,
+        category: 'Business' as const,
+        priority: 'medium' as const,
+        dueDate: event.date,
+        confidence: 85,
+        approved: false,
+        sourceTranscriptId: transcriptId,
+      })),
+      ...(extractedData.ideas || []).map((idea: any) => ({
+        type: 'idea' as const,
+        title: idea.title,
+        description: idea.description,
+        category: 'Projects' as const,
+        priority: 'medium' as const,
+        confidence: 85,
+        approved: false,
+        sourceTranscriptId: transcriptId,
+      })),
+      ...(extractedData.contacts || []).map((contact: any) => ({
+        type: 'contact' as const,
+        title: contact.name,
+        description: `${contact.role || ''} ${contact.company ? `at ${contact.company}` : ''} ${contact.email || ''} ${contact.phone || ''}`.trim(),
+        category: 'Business' as const,
+        priority: 'low' as const,
+        confidence: 85,
+        approved: false,
+        sourceTranscriptId: transcriptId,
+      }))
+    ];
+
+    console.log('Adding extracted items:', extractedItems);
+    addExtractedItems(extractedItems);
   };
 
   if (activeView === 'settings') {
@@ -290,8 +334,11 @@ const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
 
       {/* Input Methods */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <FileUploader onFileProcessed={processTextWithOpenAI} />
-        <LiveRecorder onRecordingProcessed={processAudioWithOpenAI} />
+        <FileUploader 
+          onFileProcessed={processTextWithOpenAI} 
+          onAudioProcessed={processAudioFileWithOpenAI}
+        />
+        <LiveRecorder onRecordingProcessed={processAudioRecordingWithOpenAI} />
       </div>
 
       {/* State Management */}

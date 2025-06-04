@@ -1,3 +1,4 @@
+
 import { useRef, useState } from 'react';
 import { Upload, FileText, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,9 +7,10 @@ import { Badge } from '@/components/ui/badge';
 
 interface FileUploaderProps {
   onFileProcessed: (text: string, fileName: string) => void;
+  onAudioProcessed: (audioFile: File, fileName: string) => void;
 }
 
-const FileUploader = ({ onFileProcessed }: FileUploaderProps) => {
+const FileUploader = ({ onFileProcessed, onAudioProcessed }: FileUploaderProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastProcessed, setLastProcessed] = useState<string | null>(null);
@@ -29,27 +31,23 @@ const FileUploader = ({ onFileProcessed }: FileUploaderProps) => {
     setIsProcessing(true);
     
     try {
-      let text = '';
-      
       if (file.type === 'text/plain') {
         // Read text file
-        text = await new Promise<string>((resolve, reject) => {
+        const text = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = (e) => resolve(e.target?.result as string);
           reader.onerror = reject;
           reader.readAsText(file);
         });
+        
+        if (text) {
+          onFileProcessed(text, file.name);
+          setLastProcessed(file.name);
+        }
       } else if (file.type.startsWith('audio/')) {
-        // For audio files, we'll pass the file itself to the parent
-        // The parent will handle Whisper transcription
-        console.log('Audio file detected, will be transcribed by OpenAI Whisper');
-        onFileProcessed('', file.name); // Pass empty text, file will be handled by parent
-        setLastProcessed(file.name);
-        return;
-      }
-      
-      if (text) {
-        onFileProcessed(text, file.name);
+        // Handle audio files
+        console.log('Audio file detected, sending for transcription:', file.name);
+        onAudioProcessed(file, file.name);
         setLastProcessed(file.name);
       }
     } catch (error) {
