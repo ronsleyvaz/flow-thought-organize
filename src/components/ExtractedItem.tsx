@@ -1,5 +1,4 @@
-
-import { CheckSquare, Calendar, Lightbulb, User, Clock, Flag } from 'lucide-react';
+import { CheckSquare, Calendar, Lightbulb, User, Clock, Flag, FileText } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,6 +17,8 @@ interface ExtractedItemProps {
     assignee?: string;
     confidence: number;
     approved: boolean;
+    sourceTranscriptId?: string;
+    extractedAt?: string;
   };
   onToggleApproval: (id: string) => void;
 }
@@ -122,6 +123,12 @@ const ExtractedItem = ({ item, onToggleApproval }: ExtractedItemProps) => {
                 <div className="flex items-center">
                   <User className="h-3 w-3 mr-1" />
                   {item.assignee}
+                </div>
+              )}
+              {item.extractedAt && (
+                <div className="flex items-center">
+                  <FileText className="h-3 w-3 mr-1" />
+                  Extracted {new Date(item.extractedAt).toLocaleDateString()}
                 </div>
               )}
             </div>
