@@ -4,16 +4,96 @@ import Header from '@/components/Header';
 import Sidebar from '@/components/Sidebar';
 import Dashboard from '@/components/Dashboard';
 import Settings from '@/components/Settings';
+import { useAppState } from '@/hooks/useAppState';
+import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
   const [activeView, setActiveView] = useState('dashboard');
   const [activeCategory, setActiveCategory] = useState('all');
   const [apiKey, setApiKey] = useState(localStorage.getItem('openai_api_key') || '');
+  const { addProcessedTranscript, addExtractedItems } = useAppState();
+  const { toast } = useToast();
+
+  const handleFirefliesTranscriptProcessed = (extractedData: any, transcriptId: string) => {
+    // Add transcript metadata
+    const transcriptMetadataId = addProcessedTranscript({
+      name: `Fireflies Transcript ${transcriptId}`,
+      duration: 'Unknown',
+      type: 'meeting',
+      extractedItemCount: 
+        extractedData.tasks.length + 
+        extractedData.events.length + 
+        extractedData.ideas.length + 
+        extractedData.contacts.length,
+      processingConfidence: 90,
+    });
+
+    // Convert and add extracted items
+    const allItems = [
+      ...extractedData.tasks.map((task: any) => ({
+        type: 'task' as const,
+        title: task.title,
+        description: task.description,
+        category: 'Business' as const,
+        priority: task.priority || 'medium' as const,
+        dueDate: task.dueDate,
+        assignee: task.assignee,
+        confidence: 85,
+        approved: false,
+        sourceTranscriptId: transcriptMetadataId,
+      })),
+      ...extractedData.events.map((event: any) => ({
+        type: 'event' as const,
+        title: event.title,
+        description: event.description,
+        category: 'Business' as const,
+        priority: 'medium' as const,
+        dueDate: event.date && event.time ? `${event.date} ${event.time}` : event.date,
+        confidence: 85,
+        approved: false,
+        sourceTranscriptId: transcriptMetadataId,
+      })),
+      ...extractedData.ideas.map((idea: any) => ({
+        type: 'idea' as const,
+        title: idea.title,
+        description: idea.description,
+        category: 'Projects' as const,
+        priority: 'medium' as const,
+        confidence: 80,
+        approved: false,
+        sourceTranscriptId: transcriptMetadataId,
+      })),
+      ...extractedData.contacts.map((contact: any) => ({
+        type: 'contact' as const,
+        title: contact.name,
+        description: `${contact.role || ''} ${contact.company || ''}`.trim() || 
+                    `${contact.email || ''} ${contact.phone || ''}`.trim(),
+        category: 'Business' as const,
+        priority: 'low' as const,
+        confidence: 90,
+        approved: false,
+        sourceTranscriptId: transcriptMetadataId,
+      }))
+    ];
+
+    if (allItems.length > 0) {
+      addExtractedItems(allItems);
+      toast({
+        title: "Fireflies Transcript Processed",
+        description: `Extracted ${allItems.length} items from transcript`,
+      });
+    }
+  };
 
   const renderMainContent = () => {
     switch (activeView) {
       case 'settings':
-        return <Settings onApiKeyChange={setApiKey} />;
+        return (
+          <Settings 
+            onApiKeyChange={setApiKey} 
+            onFirefliesTranscriptProcessed={handleFirefliesTranscriptProcessed}
+          />
+        );
       default:
         return (
           <Dashboard 
