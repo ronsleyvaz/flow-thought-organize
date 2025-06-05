@@ -1,17 +1,4 @@
 
-interface FirefliesAuthResponse {
-  data: {
-    login: {
-      user: {
-        user_id: string;
-        name: string;
-        email: string;
-      };
-      token: string;
-    };
-  };
-}
-
 interface FirefliesTranscript {
   id: string;
   title: string;
@@ -31,61 +18,16 @@ export class FirefliesService {
   private apiUrl = 'https://api.fireflies.ai/graphql';
   private token: string | null = null;
 
-  async login(email: string, password: string): Promise<boolean> {
-    const mutation = `
-      mutation Login($email: String!, $password: String!) {
-        login(email: $email, password: $password) {
-          user {
-            user_id
-            name
-            email
-          }
-          token
-        }
-      }
-    `;
-
-    try {
-      console.log('Attempting to login to Fireflies API...');
-      
-      const response = await fetch(this.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: mutation,
-          variables: { email, password },
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data: FirefliesAuthResponse = await response.json();
-      
-      if (data.data?.login?.token) {
-        this.token = data.data.login.token;
-        localStorage.setItem('fireflies_token', this.token);
-        localStorage.setItem('fireflies_user', JSON.stringify(data.data.login.user));
-        console.log('Successfully logged into Fireflies');
-        return true;
-      } else {
-        console.error('Login failed - no token received');
-        return false;
-      }
-    } catch (error) {
-      console.error('Fireflies login error:', error);
-      return false;
-    }
+  setApiToken(token: string) {
+    this.token = token;
+    localStorage.setItem('fireflies_api_token', token);
   }
 
   async getRecentTranscripts(limit: number = 10): Promise<FirefliesTranscript[]> {
     if (!this.token) {
-      this.token = localStorage.getItem('fireflies_token');
+      this.token = localStorage.getItem('fireflies_api_token');
       if (!this.token) {
-        throw new Error('Not authenticated with Fireflies');
+        throw new Error('Fireflies API token not configured');
       }
     }
 
@@ -119,8 +61,8 @@ export class FirefliesService {
 
       if (!response.ok) {
         if (response.status === 401) {
-          this.logout();
-          throw new Error('Authentication expired. Please login again.');
+          this.clearToken();
+          throw new Error('Invalid API token. Please check your Fireflies API token.');
         }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -139,19 +81,17 @@ export class FirefliesService {
     }
   }
 
-  logout() {
+  clearToken() {
     this.token = null;
-    localStorage.removeItem('fireflies_token');
-    localStorage.removeItem('fireflies_user');
+    localStorage.removeItem('fireflies_api_token');
   }
 
   isAuthenticated(): boolean {
-    return !!this.token || !!localStorage.getItem('fireflies_token');
+    return !!this.token || !!localStorage.getItem('fireflies_api_token');
   }
 
-  getCurrentUser() {
-    const userStr = localStorage.getItem('fireflies_user');
-    return userStr ? JSON.parse(userStr) : null;
+  getStoredToken(): string | null {
+    return localStorage.getItem('fireflies_api_token');
   }
 }
 

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Eye, EyeOff, LogIn, LogOut, RefreshCw, Download } from 'lucide-react';
+import { Eye, EyeOff, Save, RefreshCw, Download, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { firefliesService } from '@/services/firefliesService';
 import { extractItemsFromText } from '@/services/openaiService';
@@ -15,73 +15,54 @@ interface FirefliesIntegrationProps {
 }
 
 const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegrationProps) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [firefliesToken, setFirefliesToken] = useState('');
+  const [showToken, setShowToken] = useState(false);
+  const [isConfigured, setIsConfigured] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+  const [tokenSaved, setTokenSaved] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    setIsAuthenticated(firefliesService.isAuthenticated());
-    setCurrentUser(firefliesService.getCurrentUser());
+    const storedToken = firefliesService.getStoredToken();
+    if (storedToken) {
+      setFirefliesToken(storedToken);
+      setIsConfigured(true);
+    }
     setLastSyncTime(localStorage.getItem('fireflies_last_sync'));
   }, []);
 
-  const handleLogin = async () => {
-    if (!email || !password) {
+  const handleSaveToken = () => {
+    if (!firefliesToken.trim()) {
       toast({
-        title: "Missing Credentials",
-        description: "Please enter both email and password",
+        title: "Missing Token",
+        description: "Please enter your Fireflies API token",
         variant: "destructive",
       });
       return;
     }
 
-    setIsLoggingIn(true);
+    firefliesService.setApiToken(firefliesToken);
+    setIsConfigured(true);
+    setTokenSaved(true);
+    setTimeout(() => setTokenSaved(false), 2000);
     
-    try {
-      const success = await firefliesService.login(email, password);
-      
-      if (success) {
-        setIsAuthenticated(true);
-        setCurrentUser(firefliesService.getCurrentUser());
-        setPassword(''); // Clear password for security
-        toast({
-          title: "Login Successful",
-          description: "Connected to Fireflies successfully",
-        });
-      } else {
-        toast({
-          title: "Login Failed",
-          description: "Invalid email or password",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      toast({
-        title: "Login Error",
-        description: "Failed to connect to Fireflies. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoggingIn(false);
-    }
+    toast({
+      title: "Token Saved",
+      description: "Fireflies API token configured successfully",
+    });
   };
 
-  const handleLogout = () => {
-    firefliesService.logout();
-    setIsAuthenticated(false);
-    setCurrentUser(null);
+  const handleDisconnect = () => {
+    firefliesService.clearToken();
+    setFirefliesToken('');
+    setIsConfigured(false);
     setLastSyncTime(null);
     localStorage.removeItem('fireflies_last_sync');
+    
     toast({
-      title: "Logged Out",
-      description: "Disconnected from Fireflies",
+      title: "Disconnected",
+      description: "Fireflies integration disconnected",
     });
   };
 
@@ -89,7 +70,7 @@ const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegr
     if (!apiKey) {
       toast({
         title: "OpenAI API Key Required",
-        description: "Please configure your OpenAI API key in settings first",
+        description: "Please configure your OpenAI API key first",
         variant: "destructive",
       });
       return;
@@ -139,70 +120,57 @@ const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegr
     }
   };
 
-  if (!isAuthenticated) {
+  if (!isConfigured) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <LogIn className="h-5 w-5 mr-2" />
-            Connect to Fireflies
-          </CardTitle>
+          <CardTitle>Connect to Fireflies</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="fireflies-email">Email</Label>
-            <Input
-              id="fireflies-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
-            />
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <h4 className="font-medium text-blue-900 mb-2">How to get your Fireflies API Token:</h4>
+            <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+              <li>Visit <a href="https://app.fireflies.ai/integrations/custom/api" target="_blank" rel="noopener noreferrer" className="underline inline-flex items-center">Fireflies API Settings <ExternalLink className="h-3 w-3 ml-1" /></a></li>
+              <li>Sign in with your Google or Microsoft account</li>
+              <li>Generate a new API token</li>
+              <li>Copy the token and paste it below</li>
+            </ol>
           </div>
-          
+
           <div className="space-y-2">
-            <Label htmlFor="fireflies-password">Password</Label>
-            <div className="relative">
-              <Input
-                id="fireflies-password"
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Your Fireflies password"
-                className="pr-10"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-0 top-0 h-full px-3"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            <Label htmlFor="fireflies-token">Fireflies API Token</Label>
+            <div className="flex space-x-2">
+              <div className="relative flex-1">
+                <Input
+                  id="fireflies-token"
+                  type={showToken ? 'text' : 'password'}
+                  value={firefliesToken}
+                  onChange={(e) => setFirefliesToken(e.target.value)}
+                  placeholder="Your Fireflies API token"
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3"
+                  onClick={() => setShowToken(!showToken)}
+                >
+                  {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              <Button onClick={handleSaveToken} disabled={!firefliesToken.trim()}>
+                <Save className="h-4 w-4 mr-2" />
+                Save
               </Button>
             </div>
+            {tokenSaved && (
+              <p className="text-sm text-green-600">API token saved successfully!</p>
+            )}
           </div>
 
-          <Button 
-            onClick={handleLogin} 
-            disabled={isLoggingIn || !email || !password}
-            className="w-full"
-          >
-            {isLoggingIn ? (
-              <>
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                Connecting...
-              </>
-            ) : (
-              <>
-                <LogIn className="h-4 w-4 mr-2" />
-                Connect to Fireflies
-              </>
-            )}
-          </Button>
-
           <p className="text-xs text-gray-500">
-            Use your Fireflies.ai account credentials to connect and automatically sync transcripts.
+            Your API token is stored locally in your browser and never sent to our servers.
           </p>
         </CardContent>
       </Card>
@@ -214,11 +182,10 @@ const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegr
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span className="flex items-center">
-            <LogIn className="h-5 w-5 mr-2 text-green-600" />
+            <Download className="h-5 w-5 mr-2 text-green-600" />
             Connected to Fireflies
           </span>
-          <Button variant="outline" size="sm" onClick={handleLogout}>
-            <LogOut className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" onClick={handleDisconnect}>
             Disconnect
           </Button>
         </CardTitle>
@@ -226,7 +193,7 @@ const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegr
       <CardContent className="space-y-4">
         <div className="bg-green-50 p-3 rounded-lg">
           <p className="text-sm text-green-800">
-            Connected as: <strong>{currentUser?.name || currentUser?.email}</strong>
+            <strong>Fireflies integration active</strong>
           </p>
           {lastSyncTime && (
             <p className="text-xs text-green-600 mt-1">
@@ -249,7 +216,7 @@ const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegr
             <>
               <Download className="h-4 w-4 mr-2" />
               Sync Recent Transcripts
-            </>
+            <//>
           )}
         </Button>
 
@@ -259,7 +226,7 @@ const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegr
             <li>• Click "Sync Recent Transcripts" to fetch your latest Fireflies transcripts</li>
             <li>• Each transcript will be automatically processed for tasks, events, ideas, and contacts</li>
             <li>• Extracted items will appear in your TranscriptFlow dashboard</li>
-            <li>• You can sync manually or set up regular syncing</li>
+            <li>• You can sync manually whenever you want fresh data</li>
           </ul>
         </div>
       </CardContent>
