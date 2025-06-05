@@ -216,7 +216,7 @@ const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegr
             <>
               <Download className="h-4 w-4 mr-2" />
               Sync Recent Transcripts
-            <//>
+            </>
           )}
         </Button>
 
