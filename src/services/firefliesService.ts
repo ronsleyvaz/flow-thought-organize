@@ -2,8 +2,12 @@
 interface FirefliesTranscript {
   id: string;
   title: string;
-  transcript: string;
-  summary: string;
+  transcript_url: string;
+  summary: {
+    overview: string;
+    action_items: string[];
+    keywords: string[];
+  };
   date: string;
   duration: number;
 }
@@ -36,8 +40,12 @@ export class FirefliesService {
         transcripts(limit: $limit) {
           id
           title
-          transcript
-          summary
+          transcript_url
+          summary {
+            overview
+            action_items
+            keywords
+          }
           date
           duration
         }
@@ -77,6 +85,19 @@ export class FirefliesService {
       return [];
     } catch (error) {
       console.error('Error fetching transcripts:', error);
+      throw error;
+    }
+  }
+
+  async getTranscriptContent(transcriptUrl: string): Promise<string> {
+    try {
+      const response = await fetch(transcriptUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch transcript content: ${response.status}`);
+      }
+      return await response.text();
+    } catch (error) {
+      console.error('Error fetching transcript content:', error);
       throw error;
     }
   }

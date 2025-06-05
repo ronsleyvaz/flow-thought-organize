@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,10 +7,24 @@ import { Eye, EyeOff, Save, RefreshCw, Download, ExternalLink } from 'lucide-rea
 import { useToast } from '@/hooks/use-toast';
 import { firefliesService } from '@/services/firefliesService';
 import { extractItemsFromText } from '@/services/openaiService';
+import TranscriptSelector from '@/components/TranscriptSelector';
 
 interface FirefliesIntegrationProps {
   onTranscriptProcessed: (items: any, transcriptId: string) => void;
   apiKey: string;
+}
+
+interface Transcript {
+  id: string;
+  title: string;
+  transcript_url: string;
+  summary: {
+    overview: string;
+    action_items: string[];
+    keywords: string[];
+  };
+  date: string;
+  duration: number;
 }
 
 const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegrationProps) => {
@@ -19,8 +32,11 @@ const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegr
   const [showToken, setShowToken] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [tokenSaved, setTokenSaved] = useState(false);
+  const [transcripts, setTranscripts] = useState<Transcript[]>([]);
+  const [showTranscriptSelector, setShowTranscriptSelector] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -66,7 +82,7 @@ const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegr
     });
   };
 
-  const handleSyncTranscripts = async () => {
+  const handleFetchTranscripts = async () => {
     if (!apiKey) {
       toast({
         title: "OpenAI API Key Required",
@@ -79,14 +95,39 @@ const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegr
     setIsFetching(true);
     
     try {
-      const transcripts = await firefliesService.getRecentTranscripts(5);
-      let processedCount = 0;
+      const fetchedTranscripts = await firefliesService.getRecentTranscripts(10);
+      setTranscripts(fetchedTranscripts);
+      setShowTranscriptSelector(true);
+      
+      toast({
+        title: "Transcripts Loaded",
+        description: `Found ${fetchedTranscripts.length} recent transcripts`,
+      });
+    } catch (error) {
+      console.error('Fetch error:', error);
+      toast({
+        title: "Fetch Failed",
+        description: error instanceof Error ? error.message : "Failed to fetch transcripts",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFetching(false);
+    }
+  };
 
-      for (const transcript of transcripts) {
-        if (transcript.transcript && transcript.transcript.trim()) {
-          console.log(`Processing transcript: ${transcript.title}`);
-          
-          const extractedData = await extractItemsFromText(transcript.transcript, apiKey);
+  const handleTranscriptsSelected = async (selectedTranscripts: Transcript[]) => {
+    setIsProcessing(true);
+    let processedCount = 0;
+
+    try {
+      for (const transcript of selectedTranscripts) {
+        console.log(`Processing transcript: ${transcript.title}`);
+        
+        // Fetch the actual transcript content
+        const transcriptContent = await firefliesService.getTranscriptContent(transcript.transcript_url);
+        
+        if (transcriptContent && transcriptContent.trim()) {
+          const extractedData = await extractItemsFromText(transcriptContent, apiKey);
           
           if (extractedData && (
             extractedData.tasks.length > 0 || 
@@ -103,21 +144,27 @@ const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegr
       const syncTime = new Date().toISOString();
       setLastSyncTime(syncTime);
       localStorage.setItem('fireflies_last_sync', syncTime);
+      setShowTranscriptSelector(false);
 
       toast({
-        title: "Sync Complete",
-        description: `Processed ${processedCount} transcripts from Fireflies`,
+        title: "Processing Complete",
+        description: `Successfully processed ${processedCount} of ${selectedTranscripts.length} transcripts`,
       });
     } catch (error) {
-      console.error('Sync error:', error);
+      console.error('Processing error:', error);
       toast({
-        title: "Sync Failed",
-        description: error instanceof Error ? error.message : "Failed to sync transcripts",
+        title: "Processing Failed",
+        description: error instanceof Error ? error.message : "Failed to process transcripts",
         variant: "destructive",
       });
     } finally {
-      setIsFetching(false);
+      setIsProcessing(false);
     }
+  };
+
+  const handleBackToMain = () => {
+    setShowTranscriptSelector(false);
+    setTranscripts([]);
   };
 
   if (!isConfigured) {
@@ -177,6 +224,17 @@ const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegr
     );
   }
 
+  if (showTranscriptSelector) {
+    return (
+      <TranscriptSelector
+        transcripts={transcripts}
+        onTranscriptsSelected={handleTranscriptsSelected}
+        onBack={handleBackToMain}
+        isProcessing={isProcessing}
+      />
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -203,19 +261,19 @@ const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegr
         </div>
 
         <Button 
-          onClick={handleSyncTranscripts} 
+          onClick={handleFetchTranscripts} 
           disabled={isFetching}
           className="w-full"
         >
           {isFetching ? (
             <>
               <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              Syncing Transcripts...
+              Loading Transcripts...
             </>
           ) : (
             <>
               <Download className="h-4 w-4 mr-2" />
-              Sync Recent Transcripts
+              Browse Recent Transcripts
             </>
           )}
         </Button>
@@ -223,10 +281,10 @@ const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegr
         <div className="bg-blue-50 p-3 rounded-lg">
           <h4 className="font-medium text-blue-900 mb-2">How it works:</h4>
           <ul className="text-sm text-blue-800 space-y-1">
-            <li>• Click "Sync Recent Transcripts" to fetch your latest Fireflies transcripts</li>
-            <li>• Each transcript will be automatically processed for tasks, events, ideas, and contacts</li>
+            <li>• Click "Browse Recent Transcripts" to see your latest Fireflies transcripts</li>
+            <li>• Select which transcripts you want to process</li>
+            <li>• Each selected transcript will be analyzed for tasks, events, ideas, and contacts</li>
             <li>• Extracted items will appear in your TranscriptFlow dashboard</li>
-            <li>• You can sync manually whenever you want fresh data</li>
           </ul>
         </div>
       </CardContent>
