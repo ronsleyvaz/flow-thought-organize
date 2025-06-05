@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -127,7 +128,10 @@ const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegr
         const transcriptContent = await firefliesService.getTranscriptContent(transcript.id);
         
         if (transcriptContent && transcriptContent.trim()) {
+          console.log(`Transcript content length: ${transcriptContent.length}`);
           const extractedData = await extractItemsFromText(transcriptContent, apiKey);
+          
+          console.log('Extracted data from ChatGPT:', extractedData);
           
           if (extractedData && (
             extractedData.tasks.length > 0 || 
@@ -135,9 +139,14 @@ const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegr
             extractedData.ideas.length > 0 || 
             extractedData.contacts.length > 0
           )) {
+            console.log('Calling onTranscriptProcessed with data:', extractedData);
             onTranscriptProcessed(extractedData, transcript.id);
             processedCount++;
+          } else {
+            console.log('No items extracted from transcript:', transcript.title);
           }
+        } else {
+          console.log('No content found for transcript:', transcript.title);
         }
       }
 
