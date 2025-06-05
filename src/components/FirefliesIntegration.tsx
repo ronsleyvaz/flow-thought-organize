@@ -123,8 +123,8 @@ const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegr
       for (const transcript of selectedTranscripts) {
         console.log(`Processing transcript: ${transcript.title}`);
         
-        // Fetch the actual transcript content
-        const transcriptContent = await firefliesService.getTranscriptContent(transcript.transcript_url);
+        // Fetch the actual transcript content using the transcript ID
+        const transcriptContent = await firefliesService.getTranscriptContent(transcript.id);
         
         if (transcriptContent && transcriptContent.trim()) {
           const extractedData = await extractItemsFromText(transcriptContent, apiKey);

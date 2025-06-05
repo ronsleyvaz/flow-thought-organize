@@ -18,6 +18,18 @@ interface FirefliesTranscriptsResponse {
   };
 }
 
+interface FirefliesTranscriptContentResponse {
+  data: {
+    transcript: {
+      sentences: Array<{
+        text: string;
+        speaker_name: string;
+        start_time: number;
+      }>;
+    };
+  };
+}
+
 export class FirefliesService {
   private apiUrl = 'https://api.fireflies.ai/graphql';
   private token: string | null = null;
@@ -89,13 +101,58 @@ export class FirefliesService {
     }
   }
 
-  async getTranscriptContent(transcriptUrl: string): Promise<string> {
+  async getTranscriptContent(transcriptId: string): Promise<string> {
+    if (!this.token) {
+      this.token = localStorage.getItem('fireflies_api_token');
+      if (!this.token) {
+        throw new Error('Fireflies API token not configured');
+      }
+    }
+
+    const query = `
+      query GetTranscript($transcriptId: String!) {
+        transcript(id: $transcriptId) {
+          sentences {
+            text
+            speaker_name
+            start_time
+          }
+        }
+      }
+    `;
+
     try {
-      const response = await fetch(transcriptUrl);
+      console.log(`Fetching transcript content for ID: ${transcriptId}`);
+      
+      const response = await fetch(this.apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.token}`,
+        },
+        body: JSON.stringify({
+          query,
+          variables: { transcriptId },
+        }),
+      });
+
       if (!response.ok) {
         throw new Error(`Failed to fetch transcript content: ${response.status}`);
       }
-      return await response.text();
+
+      const data: FirefliesTranscriptContentResponse = await response.json();
+      
+      if (data.data?.transcript?.sentences) {
+        // Convert sentences to readable transcript text
+        const transcriptText = data.data.transcript.sentences
+          .map(sentence => `${sentence.speaker_name}: ${sentence.text}`)
+          .join('\n');
+        
+        console.log(`Retrieved transcript content, length: ${transcriptText.length}`);
+        return transcriptText;
+      }
+      
+      throw new Error('No transcript content found');
     } catch (error) {
       console.error('Error fetching transcript content:', error);
       throw error;
