@@ -9,33 +9,42 @@ import StateManager from './StateManager';
 import FileUploader from './FileUploader';
 import LiveRecorder from './LiveRecorder';
 import TextInput from './TextInput';
-import { useAppState } from '@/hooks/useAppState';
+import { AppState, ExtractedItem as ExtractedItemType, TranscriptMetadata } from '@/hooks/useAppState';
 import { extractItemsFromText, transcribeAudio } from '@/services/openaiService';
 import { CheckSquare, Calendar, Lightbulb, User, FileText, TrendingUp } from 'lucide-react';
 
 interface DashboardProps {
   activeCategory?: string;
   activeView?: string;
+  appState: AppState;
+  exportState: () => void;
+  importState: (file: File) => void;
+  toggleItemApproval: (id: string) => void;
+  editExtractedItem: (id: string, updates: Partial<ExtractedItemType>) => void;
+  deleteExtractedItem: (id: string) => void;
+  clearAllData: () => void;
+  addProcessedTranscript: (metadata: Omit<TranscriptMetadata, 'id' | 'processedAt'>) => string;
+  addExtractedItems: (items: Omit<ExtractedItemType, 'id' | 'extractedAt'>[]) => void;
 }
 
-const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
+const Dashboard = ({ 
+  activeCategory, 
+  activeView, 
+  appState,
+  exportState,
+  importState,
+  toggleItemApproval,
+  editExtractedItem,
+  deleteExtractedItem,
+  clearAllData,
+  addProcessedTranscript,
+  addExtractedItems
+}: DashboardProps) => {
   const [activeTab, setActiveTab] = useState('all');
   const [isProcessing, setIsProcessing] = useState(false);
   const [apiKey, setApiKey] = useState(localStorage.getItem('openai_api_key') || '');
   const liveRecorderRef = useRef<any>(null);
   
-  const {
-    appState,
-    exportState,
-    importState,
-    toggleItemApproval,
-    editExtractedItem,
-    deleteExtractedItem,
-    clearAllData,
-    addProcessedTranscript,
-    addExtractedItems,
-  } = useAppState();
-
   const { transcriptMetadata, extractedItems } = appState;
 
   const filteredItems = activeCategory && activeCategory !== 'all' 

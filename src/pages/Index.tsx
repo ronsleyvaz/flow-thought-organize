@@ -11,7 +11,19 @@ const Index = () => {
   const [activeView, setActiveView] = useState('dashboard');
   const [activeCategory, setActiveCategory] = useState('all');
   const [apiKey, setApiKey] = useState(localStorage.getItem('openai_api_key') || '');
-  const { addProcessedTranscript, addExtractedItems } = useAppState();
+  
+  const {
+    appState,
+    exportState,
+    importState,
+    toggleItemApproval,
+    editExtractedItem,
+    deleteExtractedItem,
+    clearAllData,
+    addProcessedTranscript,
+    addExtractedItems
+  } = useAppState();
+  
   const { toast } = useToast();
 
   const handleFirefliesTranscriptProcessed = (extractedData: any, transcriptId: string) => {
@@ -113,6 +125,15 @@ const Index = () => {
           <Dashboard 
             activeCategory={activeCategory === 'all' ? undefined : activeCategory}
             activeView={activeView}
+            appState={appState}
+            exportState={exportState}
+            importState={importState}
+            toggleItemApproval={toggleItemApproval}
+            editExtractedItem={editExtractedItem}
+            deleteExtractedItem={deleteExtractedItem}
+            clearAllData={clearAllData}
+            addProcessedTranscript={addProcessedTranscript}
+            addExtractedItems={addExtractedItems}
           />
         );
     }
