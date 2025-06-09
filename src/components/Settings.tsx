@@ -4,16 +4,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Eye, EyeOff, Save, Key, Trash2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Eye, EyeOff, Save, Key, Trash2, Database } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import FirefliesIntegration from './FirefliesIntegration';
 
 interface SettingsProps {
   onApiKeyChange: (apiKey: string) => void;
   onFirefliesTranscriptProcessed: (extractedData: any, transcriptId: string) => void;
+  autoSave: boolean;
+  onAutoSaveChange: (enabled: boolean) => void;
 }
 
-const Settings = ({ onApiKeyChange, onFirefliesTranscriptProcessed }: SettingsProps) => {
+const Settings = ({ onApiKeyChange, onFirefliesTranscriptProcessed, autoSave, onAutoSaveChange }: SettingsProps) => {
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [apiKeySaved, setApiKeySaved] = useState(false);
@@ -62,8 +65,36 @@ const Settings = ({ onApiKeyChange, onFirefliesTranscriptProcessed }: SettingsPr
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
       <div>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Settings</h1>
-        <p className="text-gray-600">Configure your API keys and integrations</p>
+        <p className="text-gray-600">Configure your API keys, integrations, and preferences</p>
       </div>
+
+      {/* Auto-Save Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Database className="h-5 w-5 mr-2" />
+            Data Management
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="auto-save">Auto-save</Label>
+              <p className="text-sm text-gray-500">
+                Automatically save your data as you work
+              </p>
+            </div>
+            <Switch
+              id="auto-save"
+              checked={autoSave}
+              onCheckedChange={onAutoSaveChange}
+            />
+          </div>
+          <p className="text-xs text-gray-500">
+            When enabled, your transcripts and extracted items are automatically saved to your browser's local storage.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* OpenAI API Key Section */}
       <Card>

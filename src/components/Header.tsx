@@ -1,6 +1,7 @@
 
-import { Mic, Upload, FileText, Settings, User } from 'lucide-react';
+import { Mic, Upload, FileText, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { UserButton } from '@clerk/clerk-react';
 
 interface HeaderProps {
   onViewChange: (view: string) => void;
@@ -44,9 +45,7 @@ const Header = ({ onViewChange, activeView }: HeaderProps) => {
           >
             <Settings className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm">
-            <User className="h-4 w-4" />
-          </Button>
+          <UserButton afterSignOutUrl="/" />
         </div>
       </div>
     </header>
