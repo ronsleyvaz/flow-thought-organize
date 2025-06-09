@@ -10,7 +10,7 @@ import FirefliesIntegration from './FirefliesIntegration';
 
 interface SettingsProps {
   onApiKeyChange: (apiKey: string) => void;
-  onFirefliesTranscriptProcessed?: (extractedData: any, transcriptId: string) => void;
+  onFirefliesTranscriptProcessed: (extractedData: any, transcriptId: string) => void;
 }
 
 const Settings = ({ onApiKeyChange, onFirefliesTranscriptProcessed }: SettingsProps) => {
@@ -130,7 +130,7 @@ const Settings = ({ onApiKeyChange, onFirefliesTranscriptProcessed }: SettingsPr
 
       {/* Fireflies Integration */}
       <FirefliesIntegration 
-        onTranscriptProcessed={onFirefliesTranscriptProcessed || (() => {})}
+        onTranscriptProcessed={onFirefliesTranscriptProcessed}
         apiKey={apiKey}
       />
     </div>

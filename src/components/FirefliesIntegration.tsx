@@ -117,6 +117,7 @@ const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegr
   };
 
   const handleTranscriptsSelected = async (selectedTranscripts: Transcript[]) => {
+    console.log('handleTranscriptsSelected called with:', selectedTranscripts);
     setIsProcessing(true);
     let processedCount = 0;
 
@@ -134,12 +135,13 @@ const FirefliesIntegration = ({ onTranscriptProcessed, apiKey }: FirefliesIntegr
           console.log('Extracted data from ChatGPT:', extractedData);
           
           if (extractedData && (
-            extractedData.tasks.length > 0 || 
-            extractedData.events.length > 0 || 
-            extractedData.ideas.length > 0 || 
-            extractedData.contacts.length > 0
+            (extractedData.tasks && extractedData.tasks.length > 0) || 
+            (extractedData.events && extractedData.events.length > 0) || 
+            (extractedData.ideas && extractedData.ideas.length > 0) || 
+            (extractedData.contacts && extractedData.contacts.length > 0)
           )) {
             console.log('Calling onTranscriptProcessed with data:', extractedData);
+            console.log('onTranscriptProcessed function:', onTranscriptProcessed);
             onTranscriptProcessed(extractedData, transcript.id);
             processedCount++;
           } else {

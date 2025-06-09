@@ -15,22 +15,26 @@ const Index = () => {
   const { toast } = useToast();
 
   const handleFirefliesTranscriptProcessed = (extractedData: any, transcriptId: string) => {
+    console.log('handleFirefliesTranscriptProcessed called with:', extractedData, transcriptId);
+    
     // Add transcript metadata
     const transcriptMetadataId = addProcessedTranscript({
       name: `Fireflies Transcript ${transcriptId}`,
       duration: 'Unknown',
       type: 'meeting',
       extractedItemCount: 
-        extractedData.tasks.length + 
-        extractedData.events.length + 
-        extractedData.ideas.length + 
-        extractedData.contacts.length,
+        (extractedData.tasks?.length || 0) + 
+        (extractedData.events?.length || 0) + 
+        (extractedData.ideas?.length || 0) + 
+        (extractedData.contacts?.length || 0),
       processingConfidence: 90,
     });
 
+    console.log('Added transcript metadata with ID:', transcriptMetadataId);
+
     // Convert and add extracted items
     const allItems = [
-      ...extractedData.tasks.map((task: any) => ({
+      ...(extractedData.tasks || []).map((task: any) => ({
         type: 'task' as const,
         title: task.title,
         description: task.description,
@@ -42,7 +46,7 @@ const Index = () => {
         approved: false,
         sourceTranscriptId: transcriptMetadataId,
       })),
-      ...extractedData.events.map((event: any) => ({
+      ...(extractedData.events || []).map((event: any) => ({
         type: 'event' as const,
         title: event.title,
         description: event.description,
@@ -53,7 +57,7 @@ const Index = () => {
         approved: false,
         sourceTranscriptId: transcriptMetadataId,
       })),
-      ...extractedData.ideas.map((idea: any) => ({
+      ...(extractedData.ideas || []).map((idea: any) => ({
         type: 'idea' as const,
         title: idea.title,
         description: idea.description,
@@ -63,7 +67,7 @@ const Index = () => {
         approved: false,
         sourceTranscriptId: transcriptMetadataId,
       })),
-      ...extractedData.contacts.map((contact: any) => ({
+      ...(extractedData.contacts || []).map((contact: any) => ({
         type: 'contact' as const,
         title: contact.name,
         description: `${contact.role || ''} ${contact.company || ''}`.trim() || 
@@ -76,11 +80,21 @@ const Index = () => {
       }))
     ];
 
+    console.log('Converted items:', allItems);
+
     if (allItems.length > 0) {
       addExtractedItems(allItems);
+      console.log('Added extracted items to state');
       toast({
         title: "Fireflies Transcript Processed",
         description: `Extracted ${allItems.length} items from transcript`,
+      });
+    } else {
+      console.log('No items to add');
+      toast({
+        title: "Transcript Processed",
+        description: "No extractable items found in transcript",
+        variant: "destructive",
       });
     }
   };
