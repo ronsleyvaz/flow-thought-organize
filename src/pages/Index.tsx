@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import Header from '@/components/Header';
 import Sidebar from '@/components/Sidebar';
@@ -29,6 +28,15 @@ const Index = () => {
   const handleFirefliesTranscriptProcessed = (extractedData: any, transcriptId: string) => {
     console.log('handleFirefliesTranscriptProcessed called with:', extractedData, transcriptId);
     
+    // Filter contacts to only include those with email or phone
+    const validContacts = (extractedData.contacts || []).filter((contact: any) => {
+      const hasEmail = contact.email && contact.email.trim().length > 0;
+      const hasPhone = contact.phone && contact.phone.trim().length > 0;
+      return hasEmail || hasPhone;
+    });
+
+    console.log('Filtered contacts with contact info:', validContacts);
+
     // Add transcript metadata
     const transcriptMetadataId = addProcessedTranscript({
       name: `Fireflies Transcript ${transcriptId}`,
@@ -38,7 +46,7 @@ const Index = () => {
         (extractedData.tasks?.length || 0) + 
         (extractedData.events?.length || 0) + 
         (extractedData.ideas?.length || 0) + 
-        (extractedData.contacts?.length || 0),
+        validContacts.length, // Use filtered contacts count
       processingConfidence: 90,
     });
 
@@ -79,7 +87,8 @@ const Index = () => {
         approved: false,
         sourceTranscriptId: transcriptMetadataId,
       })),
-      ...(extractedData.contacts || []).map((contact: any) => ({
+      // Only add contacts that have email or phone
+      ...validContacts.map((contact: any) => ({
         type: 'contact' as const,
         title: contact.name,
         description: `${contact.role || ''} ${contact.company || ''}`.trim() || 

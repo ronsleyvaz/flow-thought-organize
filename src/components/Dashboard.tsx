@@ -187,11 +187,20 @@ const Dashboard = ({
   };
 
   const addItemsFromExtractedData = async (extractedData: any, fileName: string, sourceType: string) => {
-    // Calculate total items
+    // Filter contacts to only include those with email or phone
+    const validContacts = (extractedData.contacts || []).filter((contact: any) => {
+      const hasEmail = contact.email && contact.email.trim().length > 0;
+      const hasPhone = contact.phone && contact.phone.trim().length > 0;
+      return hasEmail || hasPhone;
+    });
+
+    console.log('Filtered contacts with contact info:', validContacts);
+
+    // Calculate total items using filtered contacts
     const totalItems = (extractedData.tasks?.length || 0) + 
                       (extractedData.events?.length || 0) + 
                       (extractedData.ideas?.length || 0) + 
-                      (extractedData.contacts?.length || 0);
+                      validContacts.length;
     
     // Add transcript metadata
     const transcriptId = addProcessedTranscript({
@@ -237,7 +246,8 @@ const Dashboard = ({
         approved: false,
         sourceTranscriptId: transcriptId,
       })),
-      ...(extractedData.contacts || []).map((contact: any) => ({
+      // Only add contacts that have email or phone
+      ...validContacts.map((contact: any) => ({
         type: 'contact' as const,
         title: contact.name,
         description: `${contact.role || ''} ${contact.company ? `at ${contact.company}` : ''} ${contact.email || ''} ${contact.phone || ''}`.trim(),
