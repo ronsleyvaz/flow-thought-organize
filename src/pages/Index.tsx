@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import Header from '@/components/Header';
@@ -182,6 +181,7 @@ const Index = () => {
             activeCategory={activeCategory}
             onViewChange={setActiveView}
             onCategoryChange={setActiveCategory}
+            appState={appState}
           />
           <main className="flex-1">
             {renderMainContent()}

@@ -1,15 +1,17 @@
 
 import { FileText, CheckSquare, Calendar, Lightbulb, Users, Home, Briefcase, FolderOpen, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AppState } from '@/hooks/useUserAppState';
 
 interface SidebarProps {
   activeView?: string;
   activeCategory?: string;
   onViewChange?: (view: string) => void;
   onCategoryChange?: (category: string) => void;
+  appState?: AppState;
 }
 
-const Sidebar = ({ activeView = 'dashboard', activeCategory, onViewChange, onCategoryChange }: SidebarProps) => {
+const Sidebar = ({ activeView = 'dashboard', activeCategory, onViewChange, onCategoryChange, appState }: SidebarProps) => {
   const navigation = [
     { name: 'Dashboard', key: 'dashboard', icon: Home },
     { name: 'Recent Transcripts', key: 'transcripts', icon: FileText },
@@ -20,12 +22,21 @@ const Sidebar = ({ activeView = 'dashboard', activeCategory, onViewChange, onCat
     { name: 'Settings', key: 'settings', icon: Settings },
   ];
 
+  // Calculate actual counts from appState
+  const extractedItems = appState?.extractedItems || [];
+  
+  const allCount = extractedItems.length;
+  const businessCount = extractedItems.filter(item => item.category === 'Business').length;
+  const personalCount = extractedItems.filter(item => item.category === 'Personal').length;
+  const homeCount = extractedItems.filter(item => item.category === 'Home').length;
+  const projectsCount = extractedItems.filter(item => item.category === 'Projects').length;
+
   const categories = [
-    { name: 'All', key: 'all', icon: Home, count: 0, color: 'bg-gray-100 text-gray-700' },
-    { name: 'Business', key: 'business', icon: Briefcase, count: 12, color: 'bg-blue-100 text-blue-700' },
-    { name: 'Personal', key: 'personal', icon: Users, count: 8, color: 'bg-green-100 text-green-700' },
-    { name: 'Home', key: 'home', icon: Home, count: 5, color: 'bg-purple-100 text-purple-700' },
-    { name: 'Projects', key: 'projects', icon: FolderOpen, count: 15, color: 'bg-orange-100 text-orange-700' },
+    { name: 'All', key: 'all', icon: Home, count: allCount, color: 'bg-gray-100 text-gray-700' },
+    { name: 'Business', key: 'Business', icon: Briefcase, count: businessCount, color: 'bg-blue-100 text-blue-700' },
+    { name: 'Personal', key: 'Personal', icon: Users, count: personalCount, color: 'bg-green-100 text-green-700' },
+    { name: 'Home', key: 'Home', icon: Home, count: homeCount, color: 'bg-purple-100 text-purple-700' },
+    { name: 'Projects', key: 'Projects', icon: FolderOpen, count: projectsCount, color: 'bg-orange-100 text-orange-700' },
   ];
 
   return (

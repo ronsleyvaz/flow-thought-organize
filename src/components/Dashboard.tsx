@@ -9,7 +9,7 @@ import StateManager from './StateManager';
 import FileUploader from './FileUploader';
 import LiveRecorder from './LiveRecorder';
 import TextInput from './TextInput';
-import { AppState, ExtractedItem as ExtractedItemType, TranscriptMetadata } from '@/hooks/useAppState';
+import { AppState, ExtractedItem as ExtractedItemType, TranscriptMetadata } from '@/hooks/useUserAppState';
 import { extractItemsFromText, transcribeAudio } from '@/services/openaiService';
 import { CheckSquare, Calendar, Lightbulb, User, FileText, TrendingUp } from 'lucide-react';
 
@@ -47,8 +47,9 @@ const Dashboard = ({
   
   const { transcriptMetadata, extractedItems } = appState;
 
+  // Fix the filtering logic to properly handle categories
   const filteredItems = activeCategory && activeCategory !== 'all' 
-    ? extractedItems.filter(item => item.category.toLowerCase() === activeCategory.toLowerCase())
+    ? extractedItems.filter(item => item.category === activeCategory)
     : extractedItems;
 
   const getItemsByType = (type: string) => {
