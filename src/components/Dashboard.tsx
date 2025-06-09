@@ -9,7 +9,6 @@ import StateManager from './StateManager';
 import FileUploader from './FileUploader';
 import LiveRecorder from './LiveRecorder';
 import TextInput from './TextInput';
-import Settings from './Settings';
 import { useAppState } from '@/hooks/useAppState';
 import { extractItemsFromText, transcribeAudio } from '@/services/openaiService';
 import { CheckSquare, Calendar, Lightbulb, User, FileText, TrendingUp } from 'lucide-react';
@@ -244,10 +243,6 @@ const Dashboard = ({ activeCategory, activeView }: DashboardProps) => {
     console.log('Adding extracted items:', extractedItems);
     addExtractedItems(extractedItems);
   };
-
-  if (activeView === 'settings') {
-    return <Settings onApiKeyChange={setApiKey} />;
-  }
 
   if (activeView === 'transcripts') {
     return (
