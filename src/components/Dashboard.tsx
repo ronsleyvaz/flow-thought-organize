@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,7 @@ import StateManager from './StateManager';
 import FileUploader from './FileUploader';
 import LiveRecorder from './LiveRecorder';
 import TextInput from './TextInput';
+import TranscriptDetailView from './TranscriptDetailView';
 import { AppState, ExtractedItem as ExtractedItemType, TranscriptMetadata } from '@/hooks/useUserAppState';
 import { extractItemsFromText, transcribeAudio } from '@/services/openaiService';
 import { CheckSquare, Calendar, Lightbulb, User, FileText, TrendingUp } from 'lucide-react';
@@ -60,23 +60,6 @@ const Dashboard = ({
     return baseItems.filter(item => item.type === type);
   };
 
-  const stats = [
-    { title: 'Total Items', value: filteredItems.length, icon: CheckSquare, color: 'text-blue-600' },
-    { title: 'Approved', value: filteredItems.filter(item => item.approved).length, icon: CheckSquare, color: 'text-green-600' },
-    { title: 'High Priority', value: filteredItems.filter(item => item.priority === 'high').length, icon: TrendingUp, color: 'text-red-600' },
-    { title: 'Transcripts Processed', value: transcriptMetadata.length, icon: FileText, color: 'text-purple-600' },
-  ];
-
-  const recentTranscripts = transcriptMetadata.slice(0, 3).map(metadata => ({
-    id: metadata.id,
-    name: metadata.name,
-    status: 'completed' as const,
-    extractedItems: metadata.extractedItemCount,
-    timestamp: new Date(metadata.processedAt).toLocaleString(),
-    duration: metadata.duration,
-    type: metadata.type,
-  }));
-
   // Handle transcript view details
   const handleViewTranscriptDetails = (transcriptId: string) => {
     setSelectedTranscript(transcriptId);
@@ -87,11 +70,34 @@ const Dashboard = ({
     return extractedItems.filter(item => item.sourceTranscriptId === transcriptId);
   };
 
+  // Get transcript by ID
+  const getTranscriptById = (transcriptId: string) => {
+    return transcriptMetadata.find(t => t.id === transcriptId);
+  };
+
   // Get transcript name
   const getTranscriptName = (transcriptId: string) => {
     const transcript = transcriptMetadata.find(t => t.id === transcriptId);
     return transcript ? transcript.name : 'Unknown Transcript';
   };
+
+  // If viewing transcript details, show detail view
+  if (selectedTranscript) {
+    const transcript = getTranscriptById(selectedTranscript);
+    if (transcript) {
+      const transcriptItems = getItemsForTranscript(selectedTranscript);
+      return (
+        <TranscriptDetailView
+          transcript={transcript}
+          extractedItems={transcriptItems}
+          onBack={() => setSelectedTranscript(null)}
+          onToggleApproval={toggleItemApproval}
+          onEdit={editExtractedItem}
+          onDelete={deleteExtractedItem}
+        />
+      );
+    }
+  }
 
   const processTextWithOpenAI = async (text: string, fileName: string) => {
     if (!apiKey) {
@@ -282,6 +288,23 @@ const Dashboard = ({
     addExtractedItems(extractedItems);
   };
 
+  const stats = [
+    { title: 'Total Items', value: filteredItems.length, icon: CheckSquare, color: 'text-blue-600' },
+    { title: 'Approved', value: filteredItems.filter(item => item.approved).length, icon: CheckSquare, color: 'text-green-600' },
+    { title: 'High Priority', value: filteredItems.filter(item => item.priority === 'high').length, icon: TrendingUp, color: 'text-red-600' },
+    { title: 'Transcripts Processed', value: transcriptMetadata.length, icon: FileText, color: 'text-purple-600' },
+  ];
+
+  const recentTranscripts = transcriptMetadata.slice(0, 3).map(metadata => ({
+    id: metadata.id,
+    name: metadata.name,
+    status: 'completed' as const,
+    extractedItems: metadata.extractedItemCount,
+    timestamp: new Date(metadata.processedAt).toLocaleString(),
+    duration: metadata.duration,
+    type: metadata.type,
+  }));
+
   if (activeView === 'transcripts') {
     return (
       <div className="p-6 space-y-6">
@@ -295,7 +318,18 @@ const Dashboard = ({
           <CardContent className="space-y-4">
             {recentTranscripts.length > 0 ? (
               recentTranscripts.map((transcript) => (
-                <ProcessingCard key={transcript.id} transcript={transcript} />
+                <div key={transcript.id}>
+                  <ProcessingCard transcript={transcript} />
+                  <div className="mt-2 flex justify-end">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleViewTranscriptDetails(transcript.id)}
+                    >
+                      View Details
+                    </Button>
+                  </div>
+                </div>
               ))
             ) : (
               <p className="text-gray-500 text-center py-4">
