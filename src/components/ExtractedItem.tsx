@@ -27,9 +27,10 @@ interface ExtractedItemProps {
   onToggleApproval: (id: string) => void;
   onEdit?: (id: string, updates: Partial<ExtractedItemProps['item']>) => void;
   onDelete?: (id: string) => void;
+  transcriptName?: string;
 }
 
-const ExtractedItem = ({ item, onToggleApproval, onEdit, onDelete }: ExtractedItemProps) => {
+const ExtractedItem = ({ item, onToggleApproval, onEdit, onDelete, transcriptName }: ExtractedItemProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedItem, setEditedItem] = useState(item);
 
@@ -171,6 +172,12 @@ const ExtractedItem = ({ item, onToggleApproval, onEdit, onDelete }: ExtractedIt
                 <div className="flex items-center">
                   <User className="h-3 w-3 mr-1" />
                   {item.assignee}
+                </div>
+              )}
+              {transcriptName && (
+                <div className="flex items-center">
+                  <FileText className="h-3 w-3 mr-1" />
+                  From: {transcriptName}
                 </div>
               )}
               {item.extractedAt && (

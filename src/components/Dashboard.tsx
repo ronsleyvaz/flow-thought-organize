@@ -1,3 +1,4 @@
+
 import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,6 +43,7 @@ const Dashboard = ({
 }: DashboardProps) => {
   const [activeTab, setActiveTab] = useState('all');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedTranscript, setSelectedTranscript] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState(localStorage.getItem('openai_api_key') || '');
   const liveRecorderRef = useRef<any>(null);
   
@@ -74,6 +76,22 @@ const Dashboard = ({
     duration: metadata.duration,
     type: metadata.type,
   }));
+
+  // Handle transcript view details
+  const handleViewTranscriptDetails = (transcriptId: string) => {
+    setSelectedTranscript(transcriptId);
+  };
+
+  // Get items for a specific transcript
+  const getItemsForTranscript = (transcriptId: string) => {
+    return extractedItems.filter(item => item.sourceTranscriptId === transcriptId);
+  };
+
+  // Get transcript name
+  const getTranscriptName = (transcriptId: string) => {
+    const transcript = transcriptMetadata.find(t => t.id === transcriptId);
+    return transcript ? transcript.name : 'Unknown Transcript';
+  };
 
   const processTextWithOpenAI = async (text: string, fileName: string) => {
     if (!apiKey) {
@@ -417,6 +435,7 @@ const Dashboard = ({
                       onToggleApproval={toggleItemApproval}
                       onEdit={editExtractedItem}
                       onDelete={deleteExtractedItem}
+                      transcriptName={getTranscriptName(item.sourceTranscriptId)}
                     />
                   ))
                 ) : (
@@ -443,7 +462,18 @@ const Dashboard = ({
           <CardContent className="space-y-4">
             {recentTranscripts.length > 0 ? (
               recentTranscripts.map((transcript) => (
-                <ProcessingCard key={transcript.id} transcript={transcript} />
+                <div key={transcript.id}>
+                  <ProcessingCard transcript={transcript} />
+                  <div className="mt-2 flex justify-end">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleViewTranscriptDetails(transcript.id)}
+                    >
+                      View Details
+                    </Button>
+                  </div>
+                </div>
               ))
             ) : (
               <p className="text-gray-500 text-center py-4">
@@ -478,6 +508,7 @@ const Dashboard = ({
                       onToggleApproval={toggleItemApproval}
                       onEdit={editExtractedItem}
                       onDelete={deleteExtractedItem}
+                      transcriptName={getTranscriptName(item.sourceTranscriptId)}
                     />
                   ))}
                 {filteredItems.filter(item => !item.approved).length > 3 && (
