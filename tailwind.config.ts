@@ -19,6 +19,19 @@ export default {
 		},
 		extend: {
 			colors: {
+				// Amplify AI Brand Colors
+				crimson: {
+					DEFAULT: '#ed1c24',
+					50: '#fef2f2',
+					100: '#fee2e2',
+					500: '#ed1c24',
+					600: '#dc2626',
+					700: '#b91c1c',
+				},
+				'jet-black': '#000000',
+				lead: '#58595b',
+				footprint: '#c6c1a4',
+				// Keep existing design system colors
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',
@@ -62,6 +75,11 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				}
+			},
+			fontFamily: {
+				'bebas': ['Bebas Neue', 'sans-serif'],
+				'helvetica': ['Helvetica Neue', 'Arial', 'sans-serif'],
+				sans: ['Helvetica Neue', 'Arial', 'sans-serif'],
 			},
 			borderRadius: {
 				lg: 'var(--radius)',

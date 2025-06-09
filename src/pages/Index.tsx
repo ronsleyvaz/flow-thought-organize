@@ -1,9 +1,11 @@
+
 import { useState } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import Header from '@/components/Header';
 import Sidebar from '@/components/Sidebar';
 import Dashboard from '@/components/Dashboard';
 import Settings from '@/components/Settings';
+import HowToUse from '@/components/HowToUse';
 import AuthWrapper from '@/components/AuthWrapper';
 import { useUserAppState } from '@/hooks/useUserAppState';
 import { useToast } from '@/hooks/use-toast';
@@ -126,6 +128,8 @@ const Index = () => {
 
   const renderMainContent = () => {
     switch (activeView) {
+      case 'how-to-use':
+        return <HowToUse />;
       case 'settings':
         return (
           <Settings 
