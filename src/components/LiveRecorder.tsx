@@ -1,6 +1,6 @@
 
 import { useState, useRef } from 'react';
-import { Mic, MicOff, Square, Play, Edit, Send } from 'lucide-react';
+import { Mic, MicOff, Square, Play, Pause, Edit, Send, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,19 +21,22 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
   const [transcribedText, setTranscribedText] = useState('');
   const [showTranscript, setShowTranscript] = useState(false);
   const [microphoneError, setMicrophoneError] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const currentFileNameRef = useRef<string>('');
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
 
   const startRecording = async () => {
     try {
       setMicrophoneError(null);
       console.log('Requesting microphone access...');
       
-      // Request microphone with more specific constraints
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           sampleRate: 44100,
@@ -45,33 +48,17 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
       });
       
       console.log('Microphone access granted');
-      console.log('Audio tracks:', stream.getAudioTracks());
-      
-      // Check if we have audio tracks
-      const audioTracks = stream.getAudioTracks();
-      if (audioTracks.length === 0) {
-        throw new Error('No audio tracks found in the stream');
-      }
-      
-      console.log('Audio track settings:', audioTracks[0].getSettings());
-      
       streamRef.current = stream;
       
-      // Check if MediaRecorder is supported with WebM
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
         ? 'audio/webm;codecs=opus' 
         : MediaRecorder.isTypeSupported('audio/webm') 
         ? 'audio/webm' 
-        : MediaRecorder.isTypeSupported('audio/mp4') 
-        ? 'audio/mp4' 
         : 'audio/wav';
       
       console.log('Using MIME type:', mimeType);
       
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: mimeType
-      });
-      
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
@@ -84,9 +71,16 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
 
       mediaRecorder.onstop = () => {
         console.log('Recording stopped, total chunks:', chunksRef.current.length);
-        const audioBlob = new Blob(chunksRef.current, { type: mimeType });
-        console.log('Audio blob created:', audioBlob.size, 'bytes');
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        console.log('Audio blob created:', blob.size, 'bytes');
+        setAudioBlob(blob);
         setHasRecording(true);
+        
+        // Create audio URL for playback
+        if (audioUrlRef.current) {
+          URL.revokeObjectURL(audioUrlRef.current);
+        }
+        audioUrlRef.current = URL.createObjectURL(blob);
         
         // Stop all tracks to release microphone
         if (streamRef.current) {
@@ -102,7 +96,7 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
         setMicrophoneError('Recording error occurred');
       };
 
-      mediaRecorder.start(1000); // Record in 1-second chunks
+      mediaRecorder.start(1000);
       console.log('Recording started');
       
       setIsRecording(true);
@@ -110,6 +104,7 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
       setRecordingTime(0);
       setTranscribedText('');
       setShowTranscript(false);
+      setAudioBlob(null);
       
       intervalRef.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
@@ -164,13 +159,53 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
     }
   };
 
+  const playAudio = () => {
+    if (audioUrlRef.current) {
+      if (!audioRef.current) {
+        audioRef.current = new Audio(audioUrlRef.current);
+        audioRef.current.onended = () => setIsPlaying(false);
+        audioRef.current.onerror = () => {
+          console.error('Audio playback error');
+          setIsPlaying(false);
+        };
+      }
+      
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        audioRef.current.play().then(() => {
+          setIsPlaying(true);
+        }).catch(error => {
+          console.error('Error playing audio:', error);
+        });
+      }
+    }
+  };
+
+  const downloadAudio = () => {
+    if (audioUrlRef.current && audioBlob) {
+      const fileName = `recording-${Date.now()}.webm`;
+      const link = document.createElement('a');
+      link.href = audioUrlRef.current;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   const transcribeRecording = async () => {
+    if (!audioBlob) {
+      console.error('No audio blob available for transcription');
+      return;
+    }
+
     setIsTranscribing(true);
     
     try {
       console.log('Starting transcription process...');
-      const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
-      console.log('Audio blob created for transcription:', audioBlob.size, 'bytes');
+      console.log('Audio blob for transcription:', audioBlob.size, 'bytes');
       
       if (audioBlob.size === 0) {
         throw new Error('No audio data recorded. Please try recording again.');
@@ -179,16 +214,15 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
       const fileName = `recording-${Date.now()}.webm`;
       currentFileNameRef.current = fileName;
       
-      console.log('Processing recording...');
+      console.log('Processing recording with filename:', fileName);
       
       // Call the transcription function passed from parent
       onRecordingProcessed(audioBlob, fileName);
       
-      setHasRecording(false);
+      // Don't reset hasRecording here - wait for transcription result
     } catch (error) {
       console.error('Error processing recording:', error);
       alert(`Failed to process recording: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
       setIsTranscribing(false);
     }
   };
@@ -199,7 +233,33 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
       setTranscribedText('');
       setShowTranscript(false);
       setRecordingTime(0);
+      setHasRecording(false);
+      setAudioBlob(null);
+      if (audioUrlRef.current) {
+        URL.revokeObjectURL(audioUrlRef.current);
+        audioUrlRef.current = null;
+      }
+      if (audioRef.current) {
+        audioRef.current = null;
+      }
     }
+  };
+
+  const discardRecording = () => {
+    setHasRecording(false);
+    setRecordingTime(0);
+    setAudioBlob(null);
+    setTranscribedText('');
+    setShowTranscript(false);
+    chunksRef.current = [];
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = null;
+    }
+    if (audioRef.current) {
+      audioRef.current = null;
+    }
+    setIsPlaying(false);
   };
 
   const formatTime = (seconds: number) => {
@@ -261,24 +321,43 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
                 <div className="space-y-2">
                   <Mic className="h-12 w-12 text-gray-400 mx-auto" />
                   <p className="text-sm text-gray-600">Ready to record</p>
-                  {navigator.mediaDevices && (
-                    <p className="text-xs text-gray-500">
-                      Make sure to allow microphone access when prompted
-                    </p>
-                  )}
+                  <p className="text-xs text-gray-500">
+                    Make sure to allow microphone access when prompted
+                  </p>
                 </div>
               )}
               
               {hasRecording && !isTranscribing && (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="bg-green-100 p-4 rounded-lg">
                     <p className="text-sm text-green-800">
                       Recording complete: {formatTime(recordingTime)}
                     </p>
                     <p className="text-xs text-green-600 mt-1">
-                      {chunksRef.current.length > 0 ? `${chunksRef.current.length} audio chunks recorded` : 'Ready for transcription'}
+                      {audioBlob ? `Audio ready (${(audioBlob.size / 1024).toFixed(1)} KB)` : 'Audio processing...'}
                     </p>
                   </div>
+                  
+                  {audioBlob && (
+                    <div className="flex justify-center space-x-2">
+                      <Button
+                        onClick={playAudio}
+                        variant="outline"
+                        size="sm"
+                      >
+                        {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                        {isPlaying ? 'Pause' : 'Play'}
+                      </Button>
+                      <Button
+                        onClick={downloadAudio}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <Download className="h-4 w-4" />
+                        Download
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -315,11 +394,7 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
                   <Button onClick={transcribeRecording} className="bg-green-600 hover:bg-green-700">
                     Transcribe & Process
                   </Button>
-                  <Button onClick={() => {
-                    setHasRecording(false);
-                    setRecordingTime(0);
-                    chunksRef.current = [];
-                  }} variant="outline">
+                  <Button onClick={discardRecording} variant="outline">
                     Discard
                   </Button>
                 </div>
@@ -344,8 +419,15 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
                   setShowTranscript(false);
                   setTranscribedText('');
                   setRecordingTime(0);
-                  chunksRef.current = [];
                   setHasRecording(false);
+                  setAudioBlob(null);
+                  if (audioUrlRef.current) {
+                    URL.revokeObjectURL(audioUrlRef.current);
+                    audioUrlRef.current = null;
+                  }
+                  if (audioRef.current) {
+                    audioRef.current = null;
+                  }
                 }} 
                 variant="outline"
               >
