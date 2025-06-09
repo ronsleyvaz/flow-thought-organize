@@ -1,42 +1,95 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Eye, EyeOff, Save } from 'lucide-react';
-import FirefliesIntegration from '@/components/FirefliesIntegration';
+import { Eye, EyeOff, Save, Key, Trash2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import FirefliesIntegration from './FirefliesIntegration';
 
 interface SettingsProps {
   onApiKeyChange: (apiKey: string) => void;
-  onFirefliesTranscriptProcessed?: (items: any, transcriptId: string) => void;
+  onFirefliesTranscriptProcessed?: (extractedData: any, transcriptId: string) => void;
 }
 
 const Settings = ({ onApiKeyChange, onFirefliesTranscriptProcessed }: SettingsProps) => {
-  const [apiKey, setApiKey] = useState(localStorage.getItem('openai_api_key') || '');
+  const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [apiKeySaved, setApiKeySaved] = useState(false);
+  const { toast } = useToast();
 
-  const handleSave = () => {
+  useEffect(() => {
+    const storedApiKey = localStorage.getItem('openai_api_key');
+    if (storedApiKey) {
+      setApiKey(storedApiKey);
+    }
+  }, []);
+
+  const handleSaveApiKey = () => {
+    if (!apiKey.trim()) {
+      toast({
+        title: "Missing API Key",
+        description: "Please enter your OpenAI API key",
+        variant: "destructive",
+      });
+      return;
+    }
+
     localStorage.setItem('openai_api_key', apiKey);
     onApiKeyChange(apiKey);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setApiKeySaved(true);
+    setTimeout(() => setApiKeySaved(false), 2000);
+    
+    toast({
+      title: "API Key Saved",
+      description: "OpenAI API key saved successfully",
+    });
+  };
+
+  const handleClearApiKey = () => {
+    localStorage.removeItem('openai_api_key');
+    setApiKey('');
+    onApiKeyChange('');
+    
+    toast({
+      title: "API Key Cleared",
+      description: "OpenAI API key has been removed",
+    });
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 max-w-4xl mx-auto">
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Settings</h1>
+        <p className="text-gray-600">Configure your API keys and integrations</p>
+      </div>
+
+      {/* OpenAI API Key Section */}
       <Card>
         <CardHeader>
-          <CardTitle>OpenAI API Configuration</CardTitle>
+          <CardTitle className="flex items-center">
+            <Key className="h-5 w-5 mr-2" />
+            OpenAI API Key
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <h4 className="font-medium text-blue-900 mb-2">How to get your OpenAI API Key:</h4>
+            <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+              <li>Visit <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="underline">OpenAI API Keys</a></li>
+              <li>Sign in to your OpenAI account</li>
+              <li>Click "Create new secret key"</li>
+              <li>Copy the key and paste it below</li>
+            </ol>
+          </div>
+
           <div className="space-y-2">
-            <Label htmlFor="apiKey">OpenAI API Key</Label>
+            <Label htmlFor="openai-api-key">OpenAI API Key</Label>
             <div className="flex space-x-2">
               <div className="relative flex-1">
                 <Input
-                  id="apiKey"
+                  id="openai-api-key"
                   type={showApiKey ? 'text' : 'password'}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
@@ -53,21 +106,29 @@ const Settings = ({ onApiKeyChange, onFirefliesTranscriptProcessed }: SettingsPr
                   {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
-              <Button onClick={handleSave} disabled={!apiKey.trim()}>
+              <Button onClick={handleSaveApiKey} disabled={!apiKey.trim()}>
                 <Save className="h-4 w-4 mr-2" />
                 Save
               </Button>
+              {apiKey && (
+                <Button variant="outline" onClick={handleClearApiKey}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Clear
+                </Button>
+              )}
             </div>
-            {saved && (
+            {apiKeySaved && (
               <p className="text-sm text-green-600">API key saved successfully!</p>
             )}
           </div>
+
           <p className="text-xs text-gray-500">
-            Your API key is stored locally in your browser and never sent to our servers.
+            Your API key is stored locally in your browser and is only used to make requests to OpenAI.
           </p>
         </CardContent>
       </Card>
 
+      {/* Fireflies Integration */}
       <FirefliesIntegration 
         onTranscriptProcessed={onFirefliesTranscriptProcessed || (() => {})}
         apiKey={apiKey}
