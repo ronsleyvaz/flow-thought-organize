@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,13 +6,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ProcessingCard from './ProcessingCard';
 import ExtractedItem from './ExtractedItem';
 import StateManager from './StateManager';
-import FileUploader from './FileUploader';
-import LiveRecorder from './LiveRecorder';
-import TextInput from './TextInput';
 import TranscriptDetailView from './TranscriptDetailView';
+import InputMethods from './InputMethods';
+import CollapsibleSection from './CollapsibleSection';
+import SortableItemsList from './SortableItemsList';
 import { AppState, ExtractedItem as ExtractedItemType, TranscriptMetadata } from '@/hooks/useUserAppState';
 import { extractItemsFromText, transcribeAudio } from '@/services/openaiService';
-import { CheckSquare, Calendar, Lightbulb, User, FileText, TrendingUp } from 'lucide-react';
+import { CheckSquare, Calendar, Lightbulb, User, FileText, TrendingUp, Settings, List } from 'lucide-react';
 
 interface DashboardProps {
   activeCategory?: string;
@@ -82,24 +81,6 @@ const Dashboard = ({
     const transcript = transcriptMetadata.find(t => t.id === transcriptId);
     return transcript ? transcript.name : 'Unknown Transcript';
   };
-
-  // If viewing transcript details, show detail view
-  if (selectedTranscript) {
-    const transcript = getTranscriptById(selectedTranscript);
-    if (transcript) {
-      const transcriptItems = getItemsForTranscript(selectedTranscript);
-      return (
-        <TranscriptDetailView
-          transcript={transcript}
-          extractedItems={transcriptItems}
-          onBack={() => setSelectedTranscript(null)}
-          onToggleApproval={toggleItemApproval}
-          onEdit={editExtractedItem}
-          onDelete={deleteExtractedItem}
-        />
-      );
-    }
-  }
 
   const processTextWithOpenAI = async (text: string, fileName: string) => {
     if (!apiKey) {
@@ -307,19 +288,58 @@ const Dashboard = ({
     type: metadata.type,
   }));
 
+  // If viewing transcript details, show detail view
+  if (selectedTranscript) {
+    const transcript = getTranscriptById(selectedTranscript);
+    if (transcript) {
+      const transcriptItems = getItemsForTranscript(selectedTranscript);
+      return (
+        <TranscriptDetailView
+          transcript={transcript}
+          extractedItems={transcriptItems}
+          onBack={() => setSelectedTranscript(null)}
+          onToggleApproval={toggleItemApproval}
+          onEdit={editExtractedItem}
+          onDelete={deleteExtractedItem}
+        />
+      );
+    }
+  }
+
+  // Handle specific views with sorting
+  if (activeView === 'task' || activeView === 'event' || activeView === 'idea' || activeView === 'contact') {
+    const items = getItemsByType(activeView);
+    return (
+      <div className="p-6 space-y-6">
+        <CollapsibleSection 
+          title={`${activeView}s`} 
+          icon={
+            activeView === 'task' ? <CheckSquare className="h-5 w-5 mr-2" /> :
+            activeView === 'event' ? <Calendar className="h-5 w-5 mr-2" /> :
+            activeView === 'idea' ? <Lightbulb className="h-5 w-5 mr-2" /> :
+            <User className="h-5 w-5 mr-2" />
+          }
+        >
+          <SortableItemsList
+            items={items}
+            onToggleApproval={toggleItemApproval}
+            onEdit={editExtractedItem}
+            onDelete={deleteExtractedItem}
+            getTranscriptName={getTranscriptName}
+            type={activeView}
+          />
+        </CollapsibleSection>
+      </div>
+    );
+  }
+
   if (activeView === 'transcripts') {
     return (
       <div className="p-6 space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <FileText className="h-5 w-5 mr-2" />
-              Recent Transcripts
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {recentTranscripts.length > 0 ? (
-              recentTranscripts.map((transcript) => (
+        <CollapsibleSection title="Recent Transcripts" icon={<FileText className="h-5 w-5 mr-2" />}>
+          {recentTranscripts.length > 0 ? (
+            <div className="space-y-4">
+              {recentTranscripts.map((transcript) => (
                 <div key={transcript.id}>
                   <ProcessingCard transcript={transcript} />
                   <div className="mt-2 flex justify-end">
@@ -332,51 +352,14 @@ const Dashboard = ({
                     </Button>
                   </div>
                 </div>
-              ))
-            ) : (
-              <p className="text-gray-500 text-center py-4">
-                No transcripts processed yet. Upload or record to get started.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (activeView === 'task' || activeView === 'event' || activeView === 'idea' || activeView === 'contact') {
-    const items = getItemsByType(activeView);
-    return (
-      <div className="p-6 space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center capitalize">
-              {activeView === 'task' && <CheckSquare className="h-5 w-5 mr-2" />}
-              {activeView === 'event' && <Calendar className="h-5 w-5 mr-2" />}
-              {activeView === 'idea' && <Lightbulb className="h-5 w-5 mr-2" />}
-              {activeView === 'contact' && <User className="h-5 w-5 mr-2" />}
-              {activeView}s
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {items.length > 0 ? (
-              items.map((item) => (
-                <ExtractedItem
-                  key={item.id}
-                  item={item}
-                  onToggleApproval={toggleItemApproval}
-                  onEdit={editExtractedItem}
-                  onDelete={deleteExtractedItem}
-                />
-              ))
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <p>No {activeView}s found</p>
-                <p className="text-sm">Process a transcript to see extracted items here</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-4">
+              No transcripts processed yet. Upload or record to get started.
+            </p>
+          )}
+        </CollapsibleSection>
       </div>
     );
   }
@@ -425,80 +408,58 @@ const Dashboard = ({
       </div>
 
       {/* Input Methods */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <TextInput onTextProcessed={processTextWithOpenAI} />
-        <FileUploader 
-          onFileProcessed={processTextWithOpenAI} 
-          onAudioProcessed={processAudioFileWithOpenAI}
-        />
-        <LiveRecorder 
-          ref={liveRecorderRef}
-          onRecordingProcessed={processAudioRecordingWithOpenAI}
-          onTranscribedTextProcessed={processTranscribedTextWithOpenAI}
-          apiKey={apiKey}
-        />
-      </div>
-
-      {/* State Management */}
-      <StateManager
-        onExport={exportState}
-        onImport={importState}
-        onClear={clearAllData}
-        lastSaved={appState.lastSaved}
+      <InputMethods
+        onTextProcessed={processTextWithOpenAI}
+        onFileProcessed={processTextWithOpenAI}
+        onAudioProcessed={processAudioFileWithOpenAI}
+        onRecordingProcessed={processAudioRecordingWithOpenAI}
+        onTranscribedTextProcessed={processTranscribedTextWithOpenAI}
+        apiKey={apiKey}
+        liveRecorderRef={liveRecorderRef}
       />
 
+      {/* State Management */}
+      <CollapsibleSection title="State Management" icon={<Settings className="h-5 w-5 mr-2" />} defaultCollapsed={true}>
+        <StateManager
+          onExport={exportState}
+          onImport={importState}
+          onClear={clearAllData}
+          lastSaved={appState.lastSaved}
+        />
+      </CollapsibleSection>
+
       {/* Main Content Tabs */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Extracted Items</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="all">All Items</TabsTrigger>
-              <TabsTrigger value="task">Tasks</TabsTrigger>
-              <TabsTrigger value="event">Events</TabsTrigger>
-              <TabsTrigger value="idea">Ideas</TabsTrigger>
-              <TabsTrigger value="contact">Contacts</TabsTrigger>
-            </TabsList>
-            
-            {['all', 'task', 'event', 'idea', 'contact'].map((type) => (
-              <TabsContent key={type} value={type} className="space-y-4">
-                {getItemsByType(type).length > 0 ? (
-                  getItemsByType(type).map((item) => (
-                    <ExtractedItem
-                      key={item.id}
-                      item={item}
-                      onToggleApproval={toggleItemApproval}
-                      onEdit={editExtractedItem}
-                      onDelete={deleteExtractedItem}
-                      transcriptName={getTranscriptName(item.sourceTranscriptId)}
-                    />
-                  ))
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <p>No {type === 'all' ? 'items' : `${type}s`} found</p>
-                    <p className="text-sm">Process a transcript to see extracted items here</p>
-                  </div>
-                )}
-              </TabsContent>
-            ))}
-          </Tabs>
-        </CardContent>
-      </Card>
+      <CollapsibleSection title="Extracted Items" icon={<List className="h-5 w-5 mr-2" />}>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="all">All Items</TabsTrigger>
+            <TabsTrigger value="task">Tasks</TabsTrigger>
+            <TabsTrigger value="event">Events</TabsTrigger>
+            <TabsTrigger value="idea">Ideas</TabsTrigger>
+            <TabsTrigger value="contact">Contacts</TabsTrigger>
+          </TabsList>
+          
+          {['all', 'task', 'event', 'idea', 'contact'].map((type) => (
+            <TabsContent key={type} value={type} className="space-y-4">
+              <SortableItemsList
+                items={getItemsByType(type)}
+                onToggleApproval={toggleItemApproval}
+                onEdit={editExtractedItem}
+                onDelete={deleteExtractedItem}
+                getTranscriptName={getTranscriptName}
+                type={type}
+              />
+            </TabsContent>
+          ))}
+        </Tabs>
+      </CollapsibleSection>
 
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <FileText className="h-5 w-5 mr-2" />
-              Recent Transcripts
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {recentTranscripts.length > 0 ? (
-              recentTranscripts.map((transcript) => (
+        <CollapsibleSection title="Recent Transcripts" icon={<FileText className="h-5 w-5 mr-2" />} defaultCollapsed={true}>
+          {recentTranscripts.length > 0 ? (
+            <div className="space-y-4">
+              {recentTranscripts.map((transcript) => (
                 <div key={transcript.id}>
                   <ProcessingCard transcript={transcript} />
                   <div className="mt-2 flex justify-end">
@@ -511,60 +472,56 @@ const Dashboard = ({
                     </Button>
                   </div>
                 </div>
-              ))
-            ) : (
-              <p className="text-gray-500 text-center py-4">
-                No transcripts processed yet. Upload or record to get started.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center">
-                <CheckSquare className="h-5 w-5 mr-2" />
-                Items Needing Review
-              </CardTitle>
-              <Badge variant="outline">
-                {filteredItems.filter(item => !item.approved).length} pending
-              </Badge>
+              ))}
             </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {filteredItems.filter(item => !item.approved).length > 0 ? (
-              <>
-                {filteredItems
-                  .filter(item => !item.approved)
-                  .slice(0, 3)
-                  .map((item) => (
-                    <ExtractedItem
-                      key={item.id}
-                      item={item}
-                      onToggleApproval={toggleItemApproval}
-                      onEdit={editExtractedItem}
-                      onDelete={deleteExtractedItem}
-                      transcriptName={getTranscriptName(item.sourceTranscriptId)}
-                    />
-                  ))}
-                {filteredItems.filter(item => !item.approved).length > 3 && (
-                  <Button 
-                    variant="outline" 
-                    className="w-full mt-4"
-                    onClick={() => setActiveTab('all')}
-                  >
-                    View All {filteredItems.filter(item => !item.approved).length} Items
-                  </Button>
-                )}
-              </>
-            ) : (
-              <p className="text-gray-500 text-center py-4">
-                All items have been reviewed!
-              </p>
-            )}
-          </CardContent>
-        </Card>
+          ) : (
+            <p className="text-gray-500 text-center py-4">
+              No transcripts processed yet. Upload or record to get started.
+            </p>
+          )}
+        </CollapsibleSection>
+
+        <CollapsibleSection 
+          title="Items Needing Review" 
+          icon={<CheckSquare className="h-5 w-5 mr-2" />}
+          defaultCollapsed={true}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <Badge variant="outline">
+              {filteredItems.filter(item => !item.approved).length} pending
+            </Badge>
+          </div>
+          {filteredItems.filter(item => !item.approved).length > 0 ? (
+            <>
+              {filteredItems
+                .filter(item => !item.approved)
+                .slice(0, 3)
+                .map((item) => (
+                  <ExtractedItem
+                    key={item.id}
+                    item={item}
+                    onToggleApproval={toggleItemApproval}
+                    onEdit={editExtractedItem}
+                    onDelete={deleteExtractedItem}
+                    transcriptName={getTranscriptName(item.sourceTranscriptId)}
+                  />
+                ))}
+              {filteredItems.filter(item => !item.approved).length > 3 && (
+                <Button 
+                  variant="outline" 
+                  className="w-full mt-4"
+                  onClick={() => setActiveTab('all')}
+                >
+                  View All {filteredItems.filter(item => !item.approved).length} Items
+                </Button>
+              )}
+            </>
+          ) : (
+            <p className="text-gray-500 text-center py-4">
+              All items have been reviewed!
+            </p>
+          )}
+        </CollapsibleSection>
       </div>
     </div>
   );
