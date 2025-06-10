@@ -1,3 +1,4 @@
+
 import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,7 @@ interface DashboardProps {
   clearAllData: () => void;
   addProcessedTranscript: (metadata: Omit<TranscriptMetadata, 'id' | 'processedAt'>) => string;
   addExtractedItems: (items: Omit<ExtractedItemType, 'id' | 'extractedAt'>[]) => void;
+  apiKey: string;
 }
 
 const Dashboard = ({ 
@@ -39,12 +41,12 @@ const Dashboard = ({
   deleteExtractedItem,
   clearAllData,
   addProcessedTranscript,
-  addExtractedItems
+  addExtractedItems,
+  apiKey
 }: DashboardProps) => {
   const [activeTab, setActiveTab] = useState('all');
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedTranscript, setSelectedTranscript] = useState<string | null>(null);
-  const [apiKey, setApiKey] = useState(localStorage.getItem('openai_api_key') || '');
   const liveRecorderRef = useRef<any>(null);
   
   const { transcriptMetadata, extractedItems } = appState;
@@ -433,6 +435,7 @@ const Dashboard = ({
           ref={liveRecorderRef}
           onRecordingProcessed={processAudioRecordingWithOpenAI}
           onTranscribedTextProcessed={processTranscribedTextWithOpenAI}
+          apiKey={apiKey}
         />
       </div>
 
