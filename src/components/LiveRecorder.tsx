@@ -36,10 +36,10 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
       setMicrophoneError(null);
       console.log('Requesting microphone access...');
       
-      // Request high-quality audio with specific constraints
+      // Request microphone with standard constraints
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
-          sampleRate: 48000,
+          sampleRate: 44100,
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
@@ -65,13 +65,13 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
         'audio/webm;codecs=opus',
         'audio/webm',
         'audio/mp4',
-        'audio/ogg;codecs=opus',
-        'audio/wav'
+        'audio/ogg;codecs=opus'
       ];
       
       for (const type of supportedTypes) {
         if (MediaRecorder.isTypeSupported(type)) {
           mimeType = type;
+          console.log('Selected MIME type:', mimeType);
           break;
         }
       }
@@ -80,9 +80,7 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
         throw new Error('No supported audio format found');
       }
       
-      console.log('Using MIME type:', mimeType);
-      
-      // Create MediaRecorder with higher bitrate for better quality
+      // Create MediaRecorder with appropriate settings
       const options: MediaRecorderOptions = { 
         mimeType,
         audioBitsPerSecond: 128000
@@ -152,8 +150,8 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
         console.log('MediaRecorder started successfully');
       };
 
-      // Start recording with frequent data events for better capture
-      mediaRecorder.start(100); // Collect data every 100ms
+      // Start recording with larger intervals to avoid fragmentation
+      mediaRecorder.start(1000); // Collect data every 1 second instead of 100ms
       console.log('Recording started with state:', mediaRecorder.state);
       
       setIsRecording(true);
@@ -226,51 +224,71 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
 
   const playAudio = async () => {
     console.log('Play audio called, audioUrlRef.current:', audioUrlRef.current);
-    console.log('Audio blob:', audioBlob);
+    console.log('Audio blob size:', audioBlob?.size);
     
     if (!audioUrlRef.current || !audioBlob) {
       console.error('No audio URL or blob available for playback');
+      setMicrophoneError('No audio available for playback');
       return;
     }
     
     try {
-      if (!audioRef.current) {
-        console.log('Creating new Audio element');
-        audioRef.current = new Audio(audioUrlRef.current);
-        
-        audioRef.current.onloadeddata = () => {
-          console.log('Audio loaded successfully, duration:', audioRef.current?.duration);
-        };
-        
-        audioRef.current.onended = () => {
-          console.log('Audio playback ended');
-          setIsPlaying(false);
-        };
-        
-        audioRef.current.onerror = (e) => {
-          console.error('Audio playback error:', e);
-          console.error('Audio error details:', audioRef.current?.error);
-          setIsPlaying(false);
-        };
-
-        audioRef.current.oncanplaythrough = () => {
-          console.log('Audio can play through');
-        };
+      // Clean up previous audio instance
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
       }
       
       if (isPlaying) {
-        console.log('Pausing audio');
-        audioRef.current.pause();
         setIsPlaying(false);
-      } else {
-        console.log('Starting audio playback');
-        await audioRef.current.play();
-        setIsPlaying(true);
-        console.log('Audio playback started successfully');
+        return;
       }
+      
+      console.log('Creating new Audio element');
+      const audio = new Audio(audioUrlRef.current);
+      audioRef.current = audio;
+      
+      // Set up event listeners
+      audio.onloadedmetadata = () => {
+        console.log('Audio metadata loaded, duration:', audio.duration);
+        if (audio.duration === Infinity || isNaN(audio.duration)) {
+          console.warn('Invalid audio duration detected');
+        }
+      };
+      
+      audio.oncanplay = () => {
+        console.log('Audio can play');
+      };
+      
+      audio.onended = () => {
+        console.log('Audio playback ended');
+        setIsPlaying(false);
+      };
+      
+      audio.onerror = (e) => {
+        console.error('Audio playback error:', e);
+        console.error('Audio error details:', audio.error);
+        setIsPlaying(false);
+        setMicrophoneError('Audio playback failed');
+      };
+
+      audio.onplay = () => {
+        console.log('Audio started playing');
+        setIsPlaying(true);
+      };
+
+      audio.onpause = () => {
+        console.log('Audio paused');
+        setIsPlaying(false);
+      };
+      
+      console.log('Starting audio playback');
+      await audio.play();
+      console.log('Audio play() called successfully');
     } catch (error) {
       console.error('Error during audio playback:', error);
       setIsPlaying(false);
+      setMicrophoneError('Failed to play audio');
     }
   };
 
@@ -308,10 +326,7 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
       
       console.log('Processing recording with filename:', fileName);
       
-      // Call the transcription function passed from parent
       onRecordingProcessed(audioBlob, fileName);
-      
-      // Don't reset hasRecording here - wait for transcription result
     } catch (error) {
       console.error('Error processing recording:', error);
       alert(`Failed to process recording: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -360,7 +375,6 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Function to be called from parent when transcription is complete
   const setTranscriptionResult = (text: string) => {
     console.log('Setting transcription result:', text.length, 'characters');
     setTranscribedText(text);
@@ -368,7 +382,6 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
     setIsTranscribing(false);
   };
 
-  // Expose this function to parent component
   React.useImperativeHandle(ref, () => ({
     setTranscriptionResult
   }));
@@ -438,7 +451,7 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
                         size="sm"
                       >
                         {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                        {isPlaying ? 'Pause' : 'Play'}
+                        {isPlaying ? 'Stop' : 'Play'}
                       </Button>
                       <Button
                         onClick={downloadAudio}
