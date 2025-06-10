@@ -1,18 +1,21 @@
 import { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Square, Play, Pause, Edit, Send, Download, Settings } from 'lucide-react';
+import { Mic, Edit, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import React from 'react';
+import RecordingSettings from './RecordingSettings';
+import RecordingControls from './RecordingControls';
+import RecordingStatus from './RecordingStatus';
 
 interface LiveRecorderProps {
   onRecordingProcessed: (audioBlob: Blob, fileName: string) => void;
   onTranscribedTextProcessed: (text: string, fileName: string) => void;
+  apiKey?: string;
 }
 
-const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: LiveRecorderProps, ref: React.ForwardedRef<any>) => {
+const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed, apiKey }: LiveRecorderProps, ref: React.ForwardedRef<any>) => {
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -26,7 +29,7 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
   const [availableDevices, setAvailableDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [volumeLevel, setVolumeLevel] = useState(0);
-  const [showDeviceSettings, setShowDeviceSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -39,7 +42,8 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
   const analyserRef = useRef<AnalyserNode | null>(null);
   const volumeIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Get available audio input devices
+  const hasValidApiKey = apiKey && apiKey.trim().length > 0;
+
   useEffect(() => {
     const getDevices = async () => {
       try {
@@ -57,10 +61,11 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
       }
     };
 
-    getDevices();
-  }, []);
+    if (hasValidApiKey) {
+      getDevices();
+    }
+  }, [hasValidApiKey, selectedDeviceId]);
 
-  // Monitor volume levels during recording
   const startVolumeMonitoring = (stream: MediaStream) => {
     try {
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -107,6 +112,11 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
   };
 
   const startRecording = async () => {
+    if (!hasValidApiKey) {
+      setMicrophoneError('OpenAI API key required for transcription');
+      return;
+    }
+
     try {
       setMicrophoneError(null);
       console.log('Starting recording with device:', selectedDeviceId);
@@ -130,29 +140,19 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
       
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       console.log('Stream obtained:', stream);
-      console.log('Audio tracks:', stream.getAudioTracks());
       
       const audioTracks = stream.getAudioTracks();
       if (audioTracks.length === 0) {
         throw new Error('No audio tracks found');
       }
       
-      console.log('Audio track settings:', audioTracks[0].getSettings());
-      console.log('Audio track constraints:', audioTracks[0].getConstraints());
-      
       streamRef.current = stream;
-      
-      // Start volume monitoring
       startVolumeMonitoring(stream);
       
-      // Test different MIME types for better compatibility
       const mimeTypes = [
         'audio/webm;codecs=opus',
         'audio/webm',
-        'audio/mp4;codecs=mp4a.40.2',
-        'audio/mp4',
-        'audio/ogg;codecs=opus',
-        'audio/wav'
+        'audio/mp4'
       ];
       
       let selectedMimeType = '';
@@ -164,24 +164,14 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
         }
       }
       
-      if (!selectedMimeType) {
-        console.error('No supported MIME types found');
-        selectedMimeType = ''; // Let browser choose default
-      }
-      
       const options = selectedMimeType ? {
         mimeType: selectedMimeType,
         audioBitsPerSecond: 128000
-      } : {
-        audioBitsPerSecond: 128000
-      };
+      } : { audioBitsPerSecond: 128000 };
       
       const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
-      
-      console.log('MediaRecorder created with options:', options);
-      console.log('MediaRecorder state:', mediaRecorder.state);
       
       mediaRecorder.ondataavailable = (event) => {
         console.log('Data available:', event.data.size, 'bytes');
@@ -216,7 +206,6 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
         }
         audioUrlRef.current = URL.createObjectURL(blob);
         
-        // Stop stream
         stream.getTracks().forEach(track => track.stop());
       };
       
@@ -226,7 +215,6 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
         stopVolumeMonitoring();
       };
       
-      // Start recording with 1-second intervals
       mediaRecorder.start(1000);
       console.log('Recording started');
       
@@ -302,9 +290,6 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
   };
 
   const playAudio = async () => {
-    console.log('Play audio called, audioUrlRef.current:', audioUrlRef.current);
-    console.log('Audio blob size:', audioBlob?.size);
-    
     if (!audioUrlRef.current || !audioBlob) {
       console.error('No audio URL or blob available for playback');
       setMicrophoneError('No audio available for playback');
@@ -312,7 +297,6 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
     }
     
     try {
-      // Clean up previous audio instance
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
@@ -323,21 +307,8 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
         return;
       }
       
-      console.log('Creating new Audio element');
       const audio = new Audio(audioUrlRef.current);
       audioRef.current = audio;
-      
-      // Set up event listeners
-      audio.onloadedmetadata = () => {
-        console.log('Audio metadata loaded, duration:', audio.duration);
-        if (audio.duration === Infinity || isNaN(audio.duration)) {
-          console.warn('Invalid audio duration detected');
-        }
-      };
-      
-      audio.oncanplay = () => {
-        console.log('Audio can play');
-      };
       
       audio.onended = () => {
         console.log('Audio playback ended');
@@ -346,7 +317,6 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
       
       audio.onerror = (e) => {
         console.error('Audio playback error:', e);
-        console.error('Audio error details:', audio.error);
         setIsPlaying(false);
         setMicrophoneError('Audio playback failed');
       };
@@ -361,9 +331,7 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
         setIsPlaying(false);
       };
       
-      console.log('Starting audio playback');
       await audio.play();
-      console.log('Audio play() called successfully');
     } catch (error) {
       console.error('Error during audio playback:', error);
       setIsPlaying(false);
@@ -387,6 +355,11 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
   const transcribeRecording = async () => {
     if (!audioBlob) {
       console.error('No audio blob available for transcription');
+      return;
+    }
+
+    if (!hasValidApiKey) {
+      setMicrophoneError('OpenAI API key required for transcription');
       return;
     }
 
@@ -448,12 +421,6 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
     setIsPlaying(false);
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
   const setTranscriptionResult = (text: string) => {
     console.log('Setting transcription result:', text.length, 'characters');
     setTranscribedText(text);
@@ -468,216 +435,120 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center">
-            <Mic className="h-5 w-5 mr-2" />
-            Live Recording
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowDeviceSettings(!showDeviceSettings)}
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
+        <CardTitle className="flex items-center">
+          <Mic className="h-5 w-5 mr-2" />
+          Live Recording
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {showDeviceSettings && (
-          <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Microphone Device</label>
-              <Select value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select microphone" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableDevices.map((device) => (
-                    <SelectItem key={device.deviceId} value={device.deviceId}>
-                      {device.label || `Microphone ${device.deviceId.slice(0, 8)}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        {!hasValidApiKey && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+            <p className="text-yellow-800 text-sm">
+              Please configure your OpenAI API key in Settings to use live recording.
+            </p>
+          </div>
+        )}
+
+        {hasValidApiKey && (
+          <>
+            <RecordingSettings
+              isOpen={showSettings}
+              onToggle={() => setShowSettings(!showSettings)}
+              availableDevices={availableDevices}
+              selectedDeviceId={selectedDeviceId}
+              onDeviceChange={setSelectedDeviceId}
+              volumeLevel={volumeLevel}
+              isRecording={isRecording}
+              disabled={!hasValidApiKey}
+            />
             
-            {isRecording && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Input Level</label>
-                <div className="flex items-center space-x-2">
-                  <div className="flex-1 bg-gray-200 rounded-full h-2">
-                    <div 
-                      className={`h-2 rounded-full transition-all duration-100 ${
-                        volumeLevel > 50 ? 'bg-green-500' : 
-                        volumeLevel > 20 ? 'bg-yellow-500' : 
-                        'bg-red-500'
-                      }`}
-                      style={{ width: `${Math.min(volumeLevel, 100)}%` }}
-                    />
-                  </div>
-                  <span className="text-xs w-8">{Math.round(volumeLevel)}</span>
-                </div>
-                <p className="text-xs text-gray-600">
-                  {volumeLevel > 10 ? 'Audio detected' : 'No audio detected - check microphone'}
-                </p>
+            {microphoneError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-red-800 text-sm">{microphoneError}</p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2"
+                  onClick={() => setMicrophoneError(null)}
+                >
+                  Try Again
+                </Button>
               </div>
             )}
-          </div>
-        )}
-        
-        {microphoneError && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <p className="text-red-800 text-sm">{microphoneError}</p>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="mt-2"
-              onClick={() => setMicrophoneError(null)}
-            >
-              Try Again
-            </Button>
-          </div>
-        )}
-        
-        {!showTranscript ? (
-          <>
-            <div className="text-center space-y-4">
-              {isRecording && (
-                <div className="space-y-2">
-                  <div className={`h-4 w-4 rounded-full mx-auto ${isPaused ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'}`}></div>
-                  <p className="text-2xl font-mono">{formatTime(recordingTime)}</p>
-                  <p className="text-sm text-gray-600">
-                    {isPaused ? 'Recording paused' : 'Recording in progress...'}
-                  </p>
-                </div>
-              )}
-              
-              {!isRecording && !hasRecording && !isTranscribing && (
-                <div className="space-y-2">
-                  <Mic className="h-12 w-12 text-gray-400 mx-auto" />
-                  <p className="text-sm text-gray-600">Ready to record</p>
-                  <p className="text-xs text-gray-500">
-                    Make sure to allow microphone access when prompted
-                  </p>
-                </div>
-              )}
-              
-              {hasRecording && !isTranscribing && (
-                <div className="space-y-3">
-                  <div className="bg-green-100 p-4 rounded-lg">
-                    <p className="text-sm text-green-800">
-                      Recording complete: {formatTime(recordingTime)}
-                    </p>
-                    <p className="text-xs text-green-600 mt-1">
-                      {audioBlob ? `Audio ready (${(audioBlob.size / 1024).toFixed(1)} KB)` : 'Audio processing...'}
-                    </p>
-                  </div>
-                  
-                  {audioBlob && (
-                    <div className="flex justify-center space-x-2">
-                      <Button
-                        onClick={playAudio}
-                        variant="outline"
-                        size="sm"
-                      >
-                        {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                        {isPlaying ? 'Stop' : 'Play'}
-                      </Button>
-                      <Button
-                        onClick={downloadAudio}
-                        variant="outline"
-                        size="sm"
-                      >
-                        <Download className="h-4 w-4" />
-                        Download
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {isTranscribing && (
-                <div className="space-y-2">
-                  <div className="animate-spin h-8 w-8 border-b-2 border-blue-600 rounded-full mx-auto"></div>
-                  <p className="text-sm text-gray-600">Transcribing audio...</p>
-                  <p className="text-xs text-gray-500">This may take a moment</p>
-                </div>
-              )}
-            </div>
             
-            <div className="flex justify-center space-x-2">
-              {!isRecording && !hasRecording && !isTranscribing && (
-                <Button onClick={startRecording} className="bg-red-600 hover:bg-red-700" disabled={!!microphoneError}>
-                  <Mic className="h-4 w-4 mr-2" />
-                  Start Recording
-                </Button>
-              )}
-              
-              {isRecording && (
-                <>
-                  <Button onClick={pauseRecording} variant="outline">
-                    {isPaused ? <Play className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+            {!showTranscript ? (
+              <>
+                <RecordingStatus
+                  isRecording={isRecording}
+                  isPaused={isPaused}
+                  hasRecording={hasRecording}
+                  isTranscribing={isTranscribing}
+                  recordingTime={recordingTime}
+                  audioBlob={audioBlob}
+                />
+                
+                <RecordingControls
+                  isRecording={isRecording}
+                  isPaused={isPaused}
+                  hasRecording={hasRecording}
+                  isTranscribing={isTranscribing}
+                  isPlaying={isPlaying}
+                  microphoneError={microphoneError}
+                  audioBlob={audioBlob}
+                  onStartRecording={startRecording}
+                  onPauseRecording={pauseRecording}
+                  onStopRecording={stopRecording}
+                  onPlayAudio={playAudio}
+                  onDownloadAudio={downloadAudio}
+                  onTranscribeRecording={transcribeRecording}
+                  onDiscardRecording={discardRecording}
+                  disabled={!hasValidApiKey}
+                />
+              </>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Edit className="h-4 w-4" />
+                  <h3 className="font-medium">Review & Edit Transcript</h3>
+                </div>
+                <Textarea
+                  value={transcribedText}
+                  onChange={(e) => setTranscribedText(e.target.value)}
+                  className="min-h-[120px]"
+                  placeholder="Transcribed text will appear here..."
+                />
+                <div className="flex justify-between space-x-2">
+                  <Button 
+                    onClick={() => {
+                      setShowTranscript(false);
+                      setTranscribedText('');
+                      setRecordingTime(0);
+                      setHasRecording(false);
+                      setAudioBlob(null);
+                      if (audioUrlRef.current) {
+                        URL.revokeObjectURL(audioUrlRef.current);
+                        audioUrlRef.current = null;
+                      }
+                      if (audioRef.current) {
+                        audioRef.current = null;
+                      }
+                    }} 
+                    variant="outline"
+                  >
+                    Cancel
                   </Button>
-                  <Button onClick={stopRecording} variant="outline">
-                    <Square className="h-4 w-4" />
-                  </Button>
-                </>
-              )}
-              
-              {hasRecording && !isTranscribing && (
-                <div className="space-x-2">
-                  <Button onClick={transcribeRecording} className="bg-green-600 hover:bg-green-700">
-                    Transcribe & Process
-                  </Button>
-                  <Button onClick={discardRecording} variant="outline">
-                    Discard
+                  <Button 
+                    onClick={processTranscribedText}
+                    className="bg-blue-600 hover:bg-blue-700"
+                    disabled={!transcribedText.trim()}
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    Process Text
                   </Button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Edit className="h-4 w-4" />
-              <h3 className="font-medium">Review & Edit Transcript</h3>
-            </div>
-            <Textarea
-              value={transcribedText}
-              onChange={(e) => setTranscribedText(e.target.value)}
-              className="min-h-[120px]"
-              placeholder="Transcribed text will appear here..."
-            />
-            <div className="flex justify-between space-x-2">
-              <Button 
-                onClick={() => {
-                  setShowTranscript(false);
-                  setTranscribedText('');
-                  setRecordingTime(0);
-                  setHasRecording(false);
-                  setAudioBlob(null);
-                  if (audioUrlRef.current) {
-                    URL.revokeObjectURL(audioUrlRef.current);
-                    audioUrlRef.current = null;
-                  }
-                  if (audioRef.current) {
-                    audioRef.current = null;
-                  }
-                }} 
-                variant="outline"
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={processTranscribedText}
-                className="bg-blue-600 hover:bg-blue-700"
-                disabled={!transcribedText.trim()}
-              >
-                <Send className="h-4 w-4 mr-2" />
-                Process Text
-              </Button>
-            </div>
-          </div>
         )}
         
         <Badge variant="outline" className="w-full justify-center text-xs">

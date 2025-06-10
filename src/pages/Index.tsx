@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import Header from '@/components/Header';
@@ -153,6 +152,7 @@ const Index = () => {
             clearAllData={clearAllData}
             addProcessedTranscript={addProcessedTranscript}
             addExtractedItems={addExtractedItems}
+            apiKey={apiKey}
           />
         );
     }

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,8 +25,9 @@ const Settings = ({ onApiKeyChange, onFirefliesTranscriptProcessed, autoSave, on
     const storedApiKey = localStorage.getItem('openai_api_key');
     if (storedApiKey) {
       setApiKey(storedApiKey);
+      onApiKeyChange(storedApiKey);
     }
-  }, []);
+  }, [onApiKeyChange]);
 
   const handleSaveApiKey = () => {
     if (!apiKey.trim()) {
