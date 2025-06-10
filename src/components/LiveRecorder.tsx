@@ -1,9 +1,10 @@
-import { useState, useRef } from 'react';
-import { Mic, MicOff, Square, Play, Pause, Edit, Send, Download } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Mic, MicOff, Square, Play, Pause, Edit, Send, Download, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import React from 'react';
 
 interface LiveRecorderProps {
@@ -22,6 +23,10 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
   const [microphoneError, setMicrophoneError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [availableDevices, setAvailableDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  const [volumeLevel, setVolumeLevel] = useState(0);
+  const [showDeviceSettings, setShowDeviceSettings] = useState(false);
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -30,129 +35,200 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
   const currentFileNameRef = useRef<string>('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const volumeIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Get available audio input devices
+  useEffect(() => {
+    const getDevices = async () => {
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputs = devices.filter(device => device.kind === 'audioinput');
+        console.log('Available audio input devices:', audioInputs);
+        setAvailableDevices(audioInputs);
+        if (audioInputs.length > 0 && !selectedDeviceId) {
+          setSelectedDeviceId(audioInputs[0].deviceId);
+        }
+      } catch (error) {
+        console.error('Error getting devices:', error);
+        setMicrophoneError('Unable to access microphone devices');
+      }
+    };
+
+    getDevices();
+  }, []);
+
+  // Monitor volume levels during recording
+  const startVolumeMonitoring = (stream: MediaStream) => {
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const analyser = audioContext.createAnalyser();
+      const microphone = audioContext.createMediaStreamSource(stream);
+      
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
+      microphone.connect(analyser);
+      
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+      
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      
+      const updateVolume = () => {
+        if (analyser && isRecording && !isPaused) {
+          analyser.getByteFrequencyData(dataArray);
+          const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
+          const normalizedVolume = Math.min(100, (average / 255) * 100);
+          setVolumeLevel(normalizedVolume);
+        }
+      };
+      
+      volumeIntervalRef.current = setInterval(updateVolume, 100);
+      console.log('Volume monitoring started');
+    } catch (error) {
+      console.error('Error setting up volume monitoring:', error);
+    }
+  };
+
+  const stopVolumeMonitoring = () => {
+    if (volumeIntervalRef.current) {
+      clearInterval(volumeIntervalRef.current);
+      volumeIntervalRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+    setVolumeLevel(0);
+    console.log('Volume monitoring stopped');
+  };
 
   const startRecording = async () => {
     try {
       setMicrophoneError(null);
-      console.log('Requesting microphone access...');
+      console.log('Starting recording with device:', selectedDeviceId);
       
-      // Request microphone with standard constraints
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
+      const constraints = {
+        audio: selectedDeviceId ? {
+          deviceId: { exact: selectedDeviceId },
+          sampleRate: 44100,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } : {
           sampleRate: 44100,
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true
         }
-      });
+      };
       
-      console.log('Microphone access granted, stream:', stream);
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log('Stream obtained:', stream);
       console.log('Audio tracks:', stream.getAudioTracks());
       
-      // Verify audio track is active
       const audioTracks = stream.getAudioTracks();
       if (audioTracks.length === 0) {
-        throw new Error('No audio tracks found in stream');
+        throw new Error('No audio tracks found');
       }
       
       console.log('Audio track settings:', audioTracks[0].getSettings());
+      console.log('Audio track constraints:', audioTracks[0].getConstraints());
+      
       streamRef.current = stream;
       
-      // Try different MIME types in order of preference
-      let mimeType = '';
-      const supportedTypes = [
+      // Start volume monitoring
+      startVolumeMonitoring(stream);
+      
+      // Test different MIME types for better compatibility
+      const mimeTypes = [
         'audio/webm;codecs=opus',
         'audio/webm',
+        'audio/mp4;codecs=mp4a.40.2',
         'audio/mp4',
-        'audio/ogg;codecs=opus'
+        'audio/ogg;codecs=opus',
+        'audio/wav'
       ];
       
-      for (const type of supportedTypes) {
-        if (MediaRecorder.isTypeSupported(type)) {
-          mimeType = type;
+      let selectedMimeType = '';
+      for (const mimeType of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(mimeType)) {
+          selectedMimeType = mimeType;
           console.log('Selected MIME type:', mimeType);
           break;
         }
       }
       
-      if (!mimeType) {
-        throw new Error('No supported audio format found');
+      if (!selectedMimeType) {
+        console.error('No supported MIME types found');
+        selectedMimeType = ''; // Let browser choose default
       }
       
-      // Create MediaRecorder with appropriate settings
-      const options: MediaRecorderOptions = { 
-        mimeType,
+      const options = selectedMimeType ? {
+        mimeType: selectedMimeType,
+        audioBitsPerSecond: 128000
+      } : {
         audioBitsPerSecond: 128000
       };
       
       const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
-
+      
+      console.log('MediaRecorder created with options:', options);
+      console.log('MediaRecorder state:', mediaRecorder.state);
+      
       mediaRecorder.ondataavailable = (event) => {
-        console.log('Data available event:', event.data.size, 'bytes, type:', event.data.type);
+        console.log('Data available:', event.data.size, 'bytes');
         if (event.data.size > 0) {
           chunksRef.current.push(event.data);
-          console.log('Total chunks so far:', chunksRef.current.length);
         }
       };
-
+      
       mediaRecorder.onstop = () => {
-        console.log('Recording stopped, processing chunks...');
-        console.log('Final chunks count:', chunksRef.current.length);
-        console.log('Chunk sizes:', chunksRef.current.map(chunk => chunk.size));
+        console.log('MediaRecorder stopped, chunks:', chunksRef.current.length);
+        stopVolumeMonitoring();
         
         if (chunksRef.current.length === 0) {
-          console.error('No audio chunks recorded');
-          setMicrophoneError('No audio data was recorded. Please try again.');
+          setMicrophoneError('No audio data recorded');
           return;
         }
         
+        const mimeType = mediaRecorder.mimeType || selectedMimeType || 'audio/webm';
         const blob = new Blob(chunksRef.current, { type: mimeType });
-        console.log('Audio blob created:', {
-          size: blob.size,
-          type: blob.type,
-          totalChunks: chunksRef.current.length
-        });
+        console.log('Final blob:', blob.size, 'bytes, type:', blob.type);
         
         if (blob.size === 0) {
-          console.error('Empty audio blob created');
-          setMicrophoneError('Recording failed - no audio data captured. Please check microphone permissions.');
+          setMicrophoneError('Empty recording - please check microphone');
           return;
         }
         
         setAudioBlob(blob);
         setHasRecording(true);
         
-        // Create audio URL for playback
         if (audioUrlRef.current) {
           URL.revokeObjectURL(audioUrlRef.current);
         }
         audioUrlRef.current = URL.createObjectURL(blob);
-        console.log('Audio URL created:', audioUrlRef.current);
         
-        // Stop all tracks to release microphone
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => {
-            console.log('Stopping track:', track.label, track.readyState);
-            track.stop();
-          });
-        }
+        // Stop stream
+        stream.getTracks().forEach(track => track.stop());
       };
-
+      
       mediaRecorder.onerror = (event) => {
         console.error('MediaRecorder error:', event);
-        setMicrophoneError('Recording error occurred');
+        setMicrophoneError('Recording failed');
+        stopVolumeMonitoring();
       };
-
-      mediaRecorder.onstart = () => {
-        console.log('MediaRecorder started successfully');
-      };
-
-      // Start recording with larger intervals to avoid fragmentation
-      mediaRecorder.start(1000); // Collect data every 1 second instead of 100ms
-      console.log('Recording started with state:', mediaRecorder.state);
+      
+      // Start recording with 1-second intervals
+      mediaRecorder.start(1000);
+      console.log('Recording started');
       
       setIsRecording(true);
       setIsPaused(false);
@@ -165,21 +241,23 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
       intervalRef.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
+      
     } catch (error) {
-      console.error('Error accessing microphone:', error);
+      console.error('Recording error:', error);
+      stopVolumeMonitoring();
       
       if (error instanceof Error) {
         if (error.name === 'NotAllowedError') {
-          setMicrophoneError('Microphone access denied. Please allow microphone access and try again.');
+          setMicrophoneError('Microphone permission denied');
         } else if (error.name === 'NotFoundError') {
-          setMicrophoneError('No microphone found. Please connect a microphone and try again.');
+          setMicrophoneError('Microphone not found');
         } else if (error.name === 'NotReadableError') {
-          setMicrophoneError('Microphone is already in use by another application.');
+          setMicrophoneError('Microphone in use by another app');
         } else {
-          setMicrophoneError(`Microphone error: ${error.message}`);
+          setMicrophoneError(`Error: ${error.message}`);
         }
       } else {
-        setMicrophoneError('Could not access microphone. Please check permissions and ensure you\'re using HTTPS.');
+        setMicrophoneError('Unable to access microphone');
       }
     }
   };
@@ -220,6 +298,7 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
     }
+    stopVolumeMonitoring();
   };
 
   const playAudio = async () => {
@@ -389,12 +468,63 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center">
-          <Mic className="h-5 w-5 mr-2" />
-          Live Recording
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center">
+            <Mic className="h-5 w-5 mr-2" />
+            Live Recording
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowDeviceSettings(!showDeviceSettings)}
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {showDeviceSettings && (
+          <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Microphone Device</label>
+              <Select value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select microphone" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableDevices.map((device) => (
+                    <SelectItem key={device.deviceId} value={device.deviceId}>
+                      {device.label || `Microphone ${device.deviceId.slice(0, 8)}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {isRecording && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Input Level</label>
+                <div className="flex items-center space-x-2">
+                  <div className="flex-1 bg-gray-200 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full transition-all duration-100 ${
+                        volumeLevel > 50 ? 'bg-green-500' : 
+                        volumeLevel > 20 ? 'bg-yellow-500' : 
+                        'bg-red-500'
+                      }`}
+                      style={{ width: `${Math.min(volumeLevel, 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-xs w-8">{Math.round(volumeLevel)}</span>
+                </div>
+                <p className="text-xs text-gray-600">
+                  {volumeLevel > 10 ? 'Audio detected' : 'No audio detected - check microphone'}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+        
         {microphoneError && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-3">
             <p className="text-red-800 text-sm">{microphoneError}</p>
