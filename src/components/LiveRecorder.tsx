@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import { Mic, MicOff, Square, Play, Pause, Edit, Send, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -37,42 +36,95 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
       setMicrophoneError(null);
       console.log('Requesting microphone access...');
       
+      // Request high-quality audio with specific constraints
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
-          sampleRate: 44100,
+          sampleRate: 48000,
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true
+          autoGainControl: true,
+          volume: 1.0
         }
       });
       
-      console.log('Microphone access granted');
+      console.log('Microphone access granted, stream:', stream);
+      console.log('Audio tracks:', stream.getAudioTracks());
+      
+      // Verify audio track is active
+      const audioTracks = stream.getAudioTracks();
+      if (audioTracks.length === 0) {
+        throw new Error('No audio tracks found in stream');
+      }
+      
+      console.log('Audio track settings:', audioTracks[0].getSettings());
       streamRef.current = stream;
       
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-        ? 'audio/webm;codecs=opus' 
-        : MediaRecorder.isTypeSupported('audio/webm') 
-        ? 'audio/webm' 
-        : 'audio/wav';
+      // Try different MIME types in order of preference
+      let mimeType = '';
+      const supportedTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/ogg;codecs=opus',
+        'audio/wav'
+      ];
+      
+      for (const type of supportedTypes) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          mimeType = type;
+          break;
+        }
+      }
+      
+      if (!mimeType) {
+        throw new Error('No supported audio format found');
+      }
       
       console.log('Using MIME type:', mimeType);
       
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      // Create MediaRecorder with higher bitrate for better quality
+      const options: MediaRecorderOptions = { 
+        mimeType,
+        audioBitsPerSecond: 128000
+      };
+      
+      const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
-        console.log('Data available:', event.data.size, 'bytes');
+        console.log('Data available event:', event.data.size, 'bytes, type:', event.data.type);
         if (event.data.size > 0) {
           chunksRef.current.push(event.data);
+          console.log('Total chunks so far:', chunksRef.current.length);
         }
       };
 
       mediaRecorder.onstop = () => {
-        console.log('Recording stopped, total chunks:', chunksRef.current.length);
+        console.log('Recording stopped, processing chunks...');
+        console.log('Final chunks count:', chunksRef.current.length);
+        console.log('Chunk sizes:', chunksRef.current.map(chunk => chunk.size));
+        
+        if (chunksRef.current.length === 0) {
+          console.error('No audio chunks recorded');
+          setMicrophoneError('No audio data was recorded. Please try again.');
+          return;
+        }
+        
         const blob = new Blob(chunksRef.current, { type: mimeType });
-        console.log('Audio blob created:', blob.size, 'bytes');
+        console.log('Audio blob created:', {
+          size: blob.size,
+          type: blob.type,
+          totalChunks: chunksRef.current.length
+        });
+        
+        if (blob.size === 0) {
+          console.error('Empty audio blob created');
+          setMicrophoneError('Recording failed - no audio data captured. Please check microphone permissions.');
+          return;
+        }
+        
         setAudioBlob(blob);
         setHasRecording(true);
         
@@ -81,11 +133,12 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
           URL.revokeObjectURL(audioUrlRef.current);
         }
         audioUrlRef.current = URL.createObjectURL(blob);
+        console.log('Audio URL created:', audioUrlRef.current);
         
         // Stop all tracks to release microphone
         if (streamRef.current) {
           streamRef.current.getTracks().forEach(track => {
-            console.log('Stopping track:', track.label);
+            console.log('Stopping track:', track.label, track.readyState);
             track.stop();
           });
         }
@@ -96,8 +149,13 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
         setMicrophoneError('Recording error occurred');
       };
 
-      mediaRecorder.start(1000);
-      console.log('Recording started');
+      mediaRecorder.onstart = () => {
+        console.log('MediaRecorder started successfully');
+      };
+
+      // Start recording with frequent data events for better capture
+      mediaRecorder.start(100); // Collect data every 100ms
+      console.log('Recording started with state:', mediaRecorder.state);
       
       setIsRecording(true);
       setIsPaused(false);
@@ -105,6 +163,7 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
       setTranscribedText('');
       setShowTranscript(false);
       setAudioBlob(null);
+      setHasRecording(false);
       
       intervalRef.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
@@ -132,11 +191,13 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       if (isPaused) {
         mediaRecorderRef.current.resume();
+        console.log('Recording resumed');
         intervalRef.current = setInterval(() => {
           setRecordingTime(prev => prev + 1);
         }, 1000);
       } else {
         mediaRecorderRef.current.pause();
+        console.log('Recording paused');
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
         }
@@ -146,11 +207,16 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
   };
 
   const stopRecording = () => {
+    console.log('Stop recording called');
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      console.log('Stopping MediaRecorder, current state:', mediaRecorderRef.current.state);
       mediaRecorderRef.current.stop();
     }
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach(track => {
+        console.log('Stopping stream track:', track.label);
+        track.stop();
+      });
     }
     setIsRecording(false);
     setIsPaused(false);
@@ -159,27 +225,53 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
     }
   };
 
-  const playAudio = () => {
-    if (audioUrlRef.current) {
+  const playAudio = async () => {
+    console.log('Play audio called, audioUrlRef.current:', audioUrlRef.current);
+    console.log('Audio blob:', audioBlob);
+    
+    if (!audioUrlRef.current || !audioBlob) {
+      console.error('No audio URL or blob available for playback');
+      return;
+    }
+    
+    try {
       if (!audioRef.current) {
+        console.log('Creating new Audio element');
         audioRef.current = new Audio(audioUrlRef.current);
-        audioRef.current.onended = () => setIsPlaying(false);
-        audioRef.current.onerror = () => {
-          console.error('Audio playback error');
+        
+        audioRef.current.onloadeddata = () => {
+          console.log('Audio loaded successfully, duration:', audioRef.current?.duration);
+        };
+        
+        audioRef.current.onended = () => {
+          console.log('Audio playback ended');
           setIsPlaying(false);
+        };
+        
+        audioRef.current.onerror = (e) => {
+          console.error('Audio playback error:', e);
+          console.error('Audio error details:', audioRef.current?.error);
+          setIsPlaying(false);
+        };
+
+        audioRef.current.oncanplaythrough = () => {
+          console.log('Audio can play through');
         };
       }
       
       if (isPlaying) {
+        console.log('Pausing audio');
         audioRef.current.pause();
         setIsPlaying(false);
       } else {
-        audioRef.current.play().then(() => {
-          setIsPlaying(true);
-        }).catch(error => {
-          console.error('Error playing audio:', error);
-        });
+        console.log('Starting audio playback');
+        await audioRef.current.play();
+        setIsPlaying(true);
+        console.log('Audio playback started successfully');
       }
+    } catch (error) {
+      console.error('Error during audio playback:', error);
+      setIsPlaying(false);
     }
   };
 
@@ -192,6 +284,7 @@ const LiveRecorder = ({ onRecordingProcessed, onTranscribedTextProcessed }: Live
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      console.log('Audio download initiated:', fileName);
     }
   };
 
