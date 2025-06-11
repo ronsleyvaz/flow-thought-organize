@@ -15,7 +15,7 @@ interface RecentActivityProps {
     extractedItems: number;
     timestamp: string;
     duration: string;
-    type: string;
+    type: 'meeting' | 'voice-memo' | 'brainstorm';
   }>;
   filteredItems: ExtractedItemType[];
   onViewTranscriptDetails: (id: string) => void;
