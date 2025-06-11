@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,6 +22,7 @@ interface DashboardProps {
   exportState: () => void;
   importState: (file: File) => void;
   toggleItemApproval: (id: string) => void;
+  toggleItemCompletion?: (id: string) => void;
   editExtractedItem: (id: string, updates: Partial<ExtractedItemType>) => void;
   deleteExtractedItem: (id: string) => void;
   clearAllData: () => void;
@@ -38,6 +38,7 @@ const Dashboard = ({
   exportState,
   importState,
   toggleItemApproval,
+  toggleItemCompletion,
   editExtractedItem,
   deleteExtractedItem,
   clearAllData,
@@ -233,6 +234,7 @@ const Dashboard = ({
         assignee: task.assignee,
         confidence: 85,
         approved: false,
+        completed: false,
         sourceTranscriptId: transcriptId,
       })),
       ...(extractedData.events || []).map((event: any) => ({
@@ -244,6 +246,7 @@ const Dashboard = ({
         dueDate: event.date,
         confidence: 85,
         approved: false,
+        completed: false,
         sourceTranscriptId: transcriptId,
       })),
       ...(extractedData.ideas || []).map((idea: any) => ({
@@ -254,6 +257,7 @@ const Dashboard = ({
         priority: 'medium' as const,
         confidence: 85,
         approved: false,
+        completed: false,
         sourceTranscriptId: transcriptId,
       })),
       // Only add contacts that have email or phone
@@ -265,6 +269,7 @@ const Dashboard = ({
         priority: 'low' as const,
         confidence: 85,
         approved: false,
+        completed: false,
         sourceTranscriptId: transcriptId,
       }))
     ];
@@ -301,29 +306,33 @@ const Dashboard = ({
     }
   }
 
-  // Handle specific views with sorting
+  const handleShowAllItems = () => {
+    setActiveTab('all');
+  };
+
+  // Handle specific views with sorting and category filtering
   if (activeView === 'task' || activeView === 'event' || activeView === 'idea' || activeView === 'contact') {
     const items = getItemsByType(activeView);
     return (
       <div className="p-6 space-y-6">
-        <CollapsibleSection 
-          title={`${activeView}s`} 
-          icon={
-            activeView === 'task' ? <CheckSquare className="h-5 w-5 mr-2" /> :
-            activeView === 'event' ? <Calendar className="h-5 w-5 mr-2" /> :
-            activeView === 'idea' ? <Lightbulb className="h-5 w-5 mr-2" /> :
-            <User className="h-5 w-5 mr-2" />
-          }
-        >
-          <SortableItemsList
-            items={items}
-            onToggleApproval={toggleItemApproval}
-            onEdit={editExtractedItem}
-            onDelete={deleteExtractedItem}
-            getTranscriptName={getTranscriptName}
-            type={activeView}
-          />
-        </CollapsibleSection>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold capitalize">{activeView}s</h1>
+          {activeCategory && activeCategory !== 'all' && (
+            <Badge variant="outline" className="text-sm">
+              {activeCategory} Category
+            </Badge>
+          )}
+        </div>
+        <SortableItemsList
+          items={items}
+          onToggleApproval={toggleItemApproval}
+          onToggleCompletion={toggleItemCompletion}
+          onEdit={editExtractedItem}
+          onDelete={deleteExtractedItem}
+          getTranscriptName={getTranscriptName}
+          type={activeView}
+          category={activeCategory}
+        />
       </div>
     );
   }
@@ -428,10 +437,12 @@ const Dashboard = ({
               <SortableItemsList
                 items={getItemsByType(type)}
                 onToggleApproval={toggleItemApproval}
+                onToggleCompletion={toggleItemCompletion}
                 onEdit={editExtractedItem}
                 onDelete={deleteExtractedItem}
                 getTranscriptName={getTranscriptName}
                 type={type}
+                category={activeCategory}
               />
             </TabsContent>
           ))}
@@ -444,10 +455,12 @@ const Dashboard = ({
         filteredItems={filteredItems}
         onViewTranscriptDetails={handleViewTranscriptDetails}
         onToggleApproval={toggleItemApproval}
+        onToggleCompletion={toggleItemCompletion}
         onEditItem={editExtractedItem}
         onDeleteItem={deleteExtractedItem}
         getTranscriptName={getTranscriptName}
         setActiveTab={setActiveTab}
+        onShowAllItems={handleShowAllItems}
       />
     </div>
   );

@@ -19,6 +19,7 @@ const Index = () => {
     exportState,
     importState,
     toggleItemApproval,
+    toggleItemCompletion,
     editExtractedItem,
     deleteExtractedItem,
     clearAllData,
@@ -147,6 +148,7 @@ const Index = () => {
             exportState={exportState}
             importState={importState}
             toggleItemApproval={toggleItemApproval}
+            toggleItemCompletion={toggleItemCompletion}
             editExtractedItem={editExtractedItem}
             deleteExtractedItem={deleteExtractedItem}
             clearAllData={clearAllData}

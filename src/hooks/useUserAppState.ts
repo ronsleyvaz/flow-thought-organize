@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useUser } from '@clerk/clerk-react';
 
@@ -23,6 +22,7 @@ export interface ExtractedItem {
   assignee?: string;
   confidence: number;
   approved: boolean;
+  completed: boolean;
   sourceTranscriptId: string;
   extractedAt: string;
 }
@@ -152,6 +152,7 @@ export const useUserAppState = () => {
       ...item,
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
       extractedAt: new Date().toISOString(),
+      completed: false, // Add default completed state
     }));
 
     setAppState(prev => ({
@@ -165,6 +166,15 @@ export const useUserAppState = () => {
       ...prev,
       extractedItems: prev.extractedItems.map(item =>
         item.id === id ? { ...item, approved: !item.approved } : item
+      ),
+    }));
+  };
+
+  const toggleItemCompletion = (id: string) => {
+    setAppState(prev => ({
+      ...prev,
+      extractedItems: prev.extractedItems.map(item =>
+        item.id === id ? { ...item, completed: !item.completed } : item
       ),
     }));
   };
@@ -196,6 +206,7 @@ export const useUserAppState = () => {
     addProcessedTranscript,
     addExtractedItems,
     toggleItemApproval,
+    toggleItemCompletion,
     editExtractedItem,
     deleteExtractedItem,
     clearAllData,

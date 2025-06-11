@@ -21,10 +21,12 @@ interface RecentActivityProps {
   filteredItems: ExtractedItemType[];
   onViewTranscriptDetails: (id: string) => void;
   onToggleApproval: (id: string) => void;
+  onToggleCompletion?: (id: string) => void;
   onEditItem: (id: string, updates: Partial<ExtractedItemType>) => void;
   onDeleteItem: (id: string) => void;
   getTranscriptName: (id: string) => string;
   setActiveTab: (tab: string) => void;
+  onShowAllItems: () => void;
 }
 
 const RecentActivity = ({
@@ -32,12 +34,14 @@ const RecentActivity = ({
   filteredItems,
   onViewTranscriptDetails,
   onToggleApproval,
+  onToggleCompletion,
   onEditItem,
   onDeleteItem,
   getTranscriptName,
-  setActiveTab
+  setActiveTab,
+  onShowAllItems
 }: RecentActivityProps) => {
-  const pendingItems = filteredItems.filter(item => !item.approved);
+  const pendingItems = filteredItems.filter(item => !item.approved && !item.completed);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -77,9 +81,12 @@ const RecentActivity = ({
         defaultCollapsed={true}
       >
         <div className="flex items-center justify-between mb-4">
-          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-            {pendingItems.length} pending
+          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+            {pendingItems.length} need review
           </Badge>
+          <div className="text-xs text-muted-foreground">
+            Review accuracy, then approve to enable completion
+          </div>
         </div>
         {pendingItems.length > 0 ? (
           <>
@@ -91,6 +98,7 @@ const RecentActivity = ({
                     key={item.id}
                     item={item}
                     onToggleApproval={onToggleApproval}
+                    onToggleCompletion={onToggleCompletion}
                     onEdit={onEditItem}
                     onDelete={onDeleteItem}
                     transcriptName={getTranscriptName(item.sourceTranscriptId)}
@@ -101,7 +109,7 @@ const RecentActivity = ({
               <Button 
                 variant="outline" 
                 className="w-full mt-4 transition-all duration-200 hover:bg-accent"
-                onClick={() => setActiveTab('all')}
+                onClick={onShowAllItems}
               >
                 View All {pendingItems.length} Items
               </Button>
@@ -113,7 +121,7 @@ const RecentActivity = ({
             title="All caught up!"
             description="Great job! All your extracted items have been reviewed and approved."
             actionLabel="View All Items"
-            onAction={() => setActiveTab('all')}
+            onAction={onShowAllItems}
           />
         )}
       </CollapsibleSection>

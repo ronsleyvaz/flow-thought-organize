@@ -1,6 +1,5 @@
-
 import { useState } from 'react';
-import { CheckSquare, Calendar, Lightbulb, User, Clock, Flag, FileText, Edit2, Trash2 } from 'lucide-react';
+import { CheckSquare, Calendar, Lightbulb, User, Clock, Flag, FileText, Edit2, Trash2, CheckCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -22,16 +21,27 @@ interface ExtractedItemProps {
     assignee?: string;
     confidence: number;
     approved: boolean;
+    completed?: boolean;
     sourceTranscriptId?: string;
     extractedAt?: string;
   };
   onToggleApproval: (id: string) => void;
+  onToggleCompletion?: (id: string) => void;
   onEdit?: (id: string, updates: Partial<ExtractedItemProps['item']>) => void;
   onDelete?: (id: string) => void;
   transcriptName?: string;
+  showCompletionToggle?: boolean;
 }
 
-const ExtractedItem = ({ item, onToggleApproval, onEdit, onDelete, transcriptName }: ExtractedItemProps) => {
+const ExtractedItem = ({ 
+  item, 
+  onToggleApproval, 
+  onToggleCompletion,
+  onEdit, 
+  onDelete, 
+  transcriptName,
+  showCompletionToggle = false 
+}: ExtractedItemProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedItem, setEditedItem] = useState(item);
   const [isLoading, setIsLoading] = useState(false);
@@ -116,20 +126,42 @@ const ExtractedItem = ({ item, onToggleApproval, onEdit, onDelete, transcriptNam
     }
   };
 
+  const handleCompletionToggle = async () => {
+    if (onToggleCompletion) {
+      setIsLoading(true);
+      try {
+        onToggleCompletion(item.id);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
   return (
     <>
       <Card className={cn(
         "transition-all duration-200 hover:shadow-md",
+        item.completed ? "bg-muted/50 border-muted opacity-75" : 
         item.approved ? "bg-green-50/50 border-green-200 shadow-sm" : "bg-card hover:bg-accent/5"
       )}>
         <CardContent className="p-4">
           <div className="flex items-start space-x-3">
-            <Checkbox
-              checked={item.approved}
-              onCheckedChange={handleApprovalToggle}
-              disabled={isLoading}
-              className="mt-1 transition-all duration-200"
-            />
+            <div className="flex flex-col gap-2">
+              <Checkbox
+                checked={item.approved}
+                onCheckedChange={handleApprovalToggle}
+                disabled={isLoading || item.completed}
+                className="transition-all duration-200"
+              />
+              {showCompletionToggle && item.approved && (
+                <Checkbox
+                  checked={item.completed || false}
+                  onCheckedChange={handleCompletionToggle}
+                  disabled={isLoading}
+                  className="transition-all duration-200"
+                />
+              )}
+            </div>
             <div className="flex-1 space-y-3">
               <div className="flex items-center space-x-2 flex-wrap">
                 <div className={cn("flex items-center transition-colors duration-200", getTypeColor())}>
@@ -138,6 +170,20 @@ const ExtractedItem = ({ item, onToggleApproval, onEdit, onDelete, transcriptNam
                     {item.type}
                   </span>
                 </div>
+                
+                {!item.approved && (
+                  <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                    Needs Review
+                  </Badge>
+                )}
+                
+                {item.completed && (
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Completed
+                  </Badge>
+                )}
+                
                 <Badge variant="outline" className={cn("transition-colors duration-200", getCategoryColor())}>
                   {item.category}
                 </Badge>
@@ -221,6 +267,14 @@ const ExtractedItem = ({ item, onToggleApproval, onEdit, onDelete, transcriptNam
                   </div>
                 )}
               </div>
+              
+              {!item.approved && !item.completed && (
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm">
+                  <p className="text-blue-800">
+                    <strong>Review needed:</strong> Check this item's accuracy and approve it to mark as ready for action.
+                  </p>
+                </div>
+              )}
             </div>
             
             {!isEditing && (
@@ -229,6 +283,7 @@ const ExtractedItem = ({ item, onToggleApproval, onEdit, onDelete, transcriptNam
                   variant="ghost" 
                   size="sm" 
                   onClick={() => setIsEditing(true)}
+                  disabled={item.completed}
                   className="h-8 w-8 p-0 hover:bg-accent transition-colors duration-200"
                 >
                   <Edit2 className="h-4 w-4" />
