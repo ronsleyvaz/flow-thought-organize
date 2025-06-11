@@ -4,8 +4,9 @@ import { Badge } from '@/components/ui/badge';
 import CollapsibleSection from './CollapsibleSection';
 import ProcessingCard from './ProcessingCard';
 import ExtractedItem from './ExtractedItem';
+import EmptyState from './EmptyState';
 import { ExtractedItem as ExtractedItemType, TranscriptMetadata } from '@/hooks/useUserAppState';
-import { CheckSquare, FileText } from 'lucide-react';
+import { CheckSquare, FileText, Upload, Mic } from 'lucide-react';
 
 interface RecentActivityProps {
   recentTranscripts: Array<{
@@ -36,6 +37,8 @@ const RecentActivity = ({
   getTranscriptName,
   setActiveTab
 }: RecentActivityProps) => {
+  const pendingItems = filteredItems.filter(item => !item.approved);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <CollapsibleSection title="Recent Transcripts" icon={<FileText className="h-5 w-5 mr-2" />} defaultCollapsed={true}>
@@ -49,6 +52,7 @@ const RecentActivity = ({
                     variant="outline" 
                     size="sm"
                     onClick={() => onViewTranscriptDetails(transcript.id)}
+                    className="transition-all duration-200 hover:bg-accent"
                   >
                     View Details
                   </Button>
@@ -57,9 +61,13 @@ const RecentActivity = ({
             ))}
           </div>
         ) : (
-          <p className="text-gray-500 text-center py-4">
-            No transcripts processed yet. Upload or record to get started.
-          </p>
+          <EmptyState
+            icon={FileText}
+            title="No transcripts yet"
+            description="Start by uploading a transcript file or recording audio to extract actionable items."
+            actionLabel="Upload File"
+            secondaryActionLabel="Start Recording"
+          />
         )}
       </CollapsibleSection>
 
@@ -69,39 +77,44 @@ const RecentActivity = ({
         defaultCollapsed={true}
       >
         <div className="flex items-center justify-between mb-4">
-          <Badge variant="outline">
-            {filteredItems.filter(item => !item.approved).length} pending
+          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+            {pendingItems.length} pending
           </Badge>
         </div>
-        {filteredItems.filter(item => !item.approved).length > 0 ? (
+        {pendingItems.length > 0 ? (
           <>
-            {filteredItems
-              .filter(item => !item.approved)
-              .slice(0, 3)
-              .map((item) => (
-                <ExtractedItem
-                  key={item.id}
-                  item={item}
-                  onToggleApproval={onToggleApproval}
-                  onEdit={onEditItem}
-                  onDelete={onDeleteItem}
-                  transcriptName={getTranscriptName(item.sourceTranscriptId)}
-                />
-              ))}
-            {filteredItems.filter(item => !item.approved).length > 3 && (
+            <div className="space-y-3">
+              {pendingItems
+                .slice(0, 3)
+                .map((item) => (
+                  <ExtractedItem
+                    key={item.id}
+                    item={item}
+                    onToggleApproval={onToggleApproval}
+                    onEdit={onEditItem}
+                    onDelete={onDeleteItem}
+                    transcriptName={getTranscriptName(item.sourceTranscriptId)}
+                  />
+                ))}
+            </div>
+            {pendingItems.length > 3 && (
               <Button 
                 variant="outline" 
-                className="w-full mt-4"
+                className="w-full mt-4 transition-all duration-200 hover:bg-accent"
                 onClick={() => setActiveTab('all')}
               >
-                View All {filteredItems.filter(item => !item.approved).length} Items
+                View All {pendingItems.length} Items
               </Button>
             )}
           </>
         ) : (
-          <p className="text-gray-500 text-center py-4">
-            All items have been reviewed!
-          </p>
+          <EmptyState
+            icon={CheckSquare}
+            title="All caught up!"
+            description="Great job! All your extracted items have been reviewed and approved."
+            actionLabel="View All Items"
+            onAction={() => setActiveTab('all')}
+          />
         )}
       </CollapsibleSection>
     </div>
