@@ -1,18 +1,20 @@
+
 import { useState, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ProcessingCard from './ProcessingCard';
-import ExtractedItem from './ExtractedItem';
-import StateManager from './StateManager';
 import TranscriptDetailView from './TranscriptDetailView';
 import InputMethods from './InputMethods';
 import CollapsibleSection from './CollapsibleSection';
 import SortableItemsList from './SortableItemsList';
+import StatsOverview from './StatsOverview';
+import RecentActivity from './RecentActivity';
+import StateManager from './StateManager';
 import { AppState, ExtractedItem as ExtractedItemType, TranscriptMetadata } from '@/hooks/useUserAppState';
 import { extractItemsFromText, transcribeAudio } from '@/services/openaiService';
-import { CheckSquare, Calendar, Lightbulb, User, FileText, TrendingUp, Settings, List } from 'lucide-react';
+import { CheckSquare, Calendar, Lightbulb, User, FileText, Settings, List } from 'lucide-react';
 
 interface DashboardProps {
   activeCategory?: string;
@@ -220,7 +222,7 @@ const Dashboard = ({
     });
 
     // Convert extracted data to our format
-    const extractedItems = [
+    const extractedItemsData = [
       ...(extractedData.tasks || []).map((task: any) => ({
         type: 'task' as const,
         title: task.title,
@@ -267,16 +269,9 @@ const Dashboard = ({
       }))
     ];
 
-    console.log('Adding extracted items:', extractedItems);
-    addExtractedItems(extractedItems);
+    console.log('Adding extracted items:', extractedItemsData);
+    addExtractedItems(extractedItemsData);
   };
-
-  const stats = [
-    { title: 'Total Items', value: filteredItems.length, icon: CheckSquare, color: 'text-blue-600' },
-    { title: 'Approved', value: filteredItems.filter(item => item.approved).length, icon: CheckSquare, color: 'text-green-600' },
-    { title: 'High Priority', value: filteredItems.filter(item => item.priority === 'high').length, icon: TrendingUp, color: 'text-red-600' },
-    { title: 'Transcripts Processed', value: transcriptMetadata.length, icon: FileText, color: 'text-purple-600' },
-  ];
 
   const recentTranscripts = transcriptMetadata.slice(0, 3).map(metadata => ({
     id: metadata.id,
@@ -340,9 +335,9 @@ const Dashboard = ({
           {recentTranscripts.length > 0 ? (
             <div className="space-y-4">
               {recentTranscripts.map((transcript) => (
-                <div key={transcript.id}>
+                <div key={transcript.id} className="space-y-2">
                   <ProcessingCard transcript={transcript} />
-                  <div className="mt-2 flex justify-end">
+                  <div className="flex justify-end">
                     <Button 
                       variant="outline" 
                       size="sm"
@@ -391,21 +386,10 @@ const Dashboard = ({
       )}
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {stats.map((stat) => (
-          <Card key={stat.title}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">{stat.title}</p>
-                  <p className="text-2xl font-bold">{stat.value}</p>
-                </div>
-                <stat.icon className={`h-8 w-8 ${stat.color}`} />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <StatsOverview
+        filteredItems={filteredItems}
+        transcriptMetadata={transcriptMetadata}
+      />
 
       {/* Input Methods */}
       <InputMethods
@@ -429,7 +413,7 @@ const Dashboard = ({
       </CollapsibleSection>
 
       {/* Main Content Tabs */}
-      <CollapsibleSection title="Extracted Items" icon={<List className="h-5 w-5 mr-2" />}>
+      <CollapsibleSection title="Extracted Items" icon={<List className="h-5 w-5 mr-2" />} defaultCollapsed={true}>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="all">All Items</TabsTrigger>
@@ -455,74 +439,16 @@ const Dashboard = ({
       </CollapsibleSection>
 
       {/* Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <CollapsibleSection title="Recent Transcripts" icon={<FileText className="h-5 w-5 mr-2" />} defaultCollapsed={true}>
-          {recentTranscripts.length > 0 ? (
-            <div className="space-y-4">
-              {recentTranscripts.map((transcript) => (
-                <div key={transcript.id}>
-                  <ProcessingCard transcript={transcript} />
-                  <div className="mt-2 flex justify-end">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleViewTranscriptDetails(transcript.id)}
-                    >
-                      View Details
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-gray-500 text-center py-4">
-              No transcripts processed yet. Upload or record to get started.
-            </p>
-          )}
-        </CollapsibleSection>
-
-        <CollapsibleSection 
-          title="Items Needing Review" 
-          icon={<CheckSquare className="h-5 w-5 mr-2" />}
-          defaultCollapsed={true}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <Badge variant="outline">
-              {filteredItems.filter(item => !item.approved).length} pending
-            </Badge>
-          </div>
-          {filteredItems.filter(item => !item.approved).length > 0 ? (
-            <>
-              {filteredItems
-                .filter(item => !item.approved)
-                .slice(0, 3)
-                .map((item) => (
-                  <ExtractedItem
-                    key={item.id}
-                    item={item}
-                    onToggleApproval={toggleItemApproval}
-                    onEdit={editExtractedItem}
-                    onDelete={deleteExtractedItem}
-                    transcriptName={getTranscriptName(item.sourceTranscriptId)}
-                  />
-                ))}
-              {filteredItems.filter(item => !item.approved).length > 3 && (
-                <Button 
-                  variant="outline" 
-                  className="w-full mt-4"
-                  onClick={() => setActiveTab('all')}
-                >
-                  View All {filteredItems.filter(item => !item.approved).length} Items
-                </Button>
-              )}
-            </>
-          ) : (
-            <p className="text-gray-500 text-center py-4">
-              All items have been reviewed!
-            </p>
-          )}
-        </CollapsibleSection>
-      </div>
+      <RecentActivity
+        recentTranscripts={recentTranscripts}
+        filteredItems={filteredItems}
+        onViewTranscriptDetails={handleViewTranscriptDetails}
+        onToggleApproval={toggleItemApproval}
+        onEditItem={editExtractedItem}
+        onDeleteItem={deleteExtractedItem}
+        getTranscriptName={getTranscriptName}
+        setActiveTab={setActiveTab}
+      />
     </div>
   );
 };

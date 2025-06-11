@@ -17,7 +17,7 @@ const CollapsibleSection = ({
   title, 
   icon, 
   children, 
-  defaultCollapsed = false,
+  defaultCollapsed = true,
   className 
 }: CollapsibleSectionProps) => {
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
