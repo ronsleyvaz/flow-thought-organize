@@ -51,16 +51,6 @@ const RecentActivity = ({
             {recentTranscripts.map((transcript) => (
               <div key={transcript.id} className="space-y-2">
                 <ProcessingCard transcript={transcript} />
-                <div className="flex justify-end">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => onViewTranscriptDetails(transcript.id)}
-                    className="transition-all duration-200 hover:bg-accent"
-                  >
-                    View Details
-                  </Button>
-                </div>
               </div>
             ))}
           </div>

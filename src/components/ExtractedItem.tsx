@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { CheckSquare, Calendar, Lightbulb, User, Clock, Flag, FileText, Edit2, Trash2, CheckCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -147,17 +148,19 @@ const ExtractedItem = ({
         <CardContent className="p-4">
           <div className="flex items-start space-x-3">
             <div className="flex flex-col gap-2">
-              <Checkbox
-                checked={item.approved}
-                onCheckedChange={handleApprovalToggle}
-                disabled={isLoading || item.completed}
-                className="transition-all duration-200"
-              />
-              {showCompletionToggle && item.approved && (
+              {/* Single checkbox that shows completion status when approved and enabled */}
+              {showCompletionToggle && item.approved ? (
                 <Checkbox
                   checked={item.completed || false}
                   onCheckedChange={handleCompletionToggle}
                   disabled={isLoading}
+                  className="transition-all duration-200"
+                />
+              ) : (
+                <Checkbox
+                  checked={item.approved}
+                  onCheckedChange={handleApprovalToggle}
+                  disabled={isLoading || item.completed}
                   className="transition-all duration-200"
                 />
               )}
