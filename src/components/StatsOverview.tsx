@@ -29,7 +29,7 @@ const StatsOverview = ({ filteredItems, transcriptMetadata }: StatsOverviewProps
               <stat.icon className={`h-8 w-8 ${stat.color}`} />
             </div>
           </CardContent>
-        </div>
+        </Card>
       ))}
     </div>
   );
