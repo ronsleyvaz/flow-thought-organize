@@ -1,6 +1,5 @@
-
 import { useState } from 'react';
-import { CheckSquare, Calendar, Lightbulb, User, Clock, Flag, FileText, Edit2, Trash2, CheckCircle } from 'lucide-react';
+import { CheckSquare, Calendar, Lightbulb, User, Clock, Flag, FileText, Edit2, Trash2, CheckCircle, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -9,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import LoadingButton from './LoadingButton';
 import ConfirmDialog from './ConfirmDialog';
+import { validateExtractedItem, sanitizeInput, ValidationError } from '@/utils/validation';
 
 interface ExtractedItemProps {
   item: {
@@ -47,6 +47,7 @@ const ExtractedItem = ({
   const [editedItem, setEditedItem] = useState(item);
   const [isLoading, setIsLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
 
   const getTypeIcon = () => {
     switch (item.type) {
@@ -101,8 +102,22 @@ const ExtractedItem = ({
   const handleSave = async () => {
     setIsLoading(true);
     try {
-      onEdit?.(item.id, editedItem);
-      setIsEditing(false);
+      // Sanitize inputs
+      const sanitizedItem = {
+        ...editedItem,
+        title: sanitizeInput(editedItem.title),
+        description: editedItem.description ? sanitizeInput(editedItem.description) : undefined,
+        assignee: editedItem.assignee ? sanitizeInput(editedItem.assignee) : undefined,
+      };
+
+      // Validate
+      const errors = validateExtractedItem(sanitizedItem);
+      setValidationErrors(errors);
+      
+      if (errors.length === 0) {
+        onEdit?.(item.id, sanitizedItem);
+        setIsEditing(false);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -110,6 +125,7 @@ const ExtractedItem = ({
 
   const handleCancel = () => {
     setEditedItem(item);
+    setValidationErrors([]);
     setIsEditing(false);
   };
 
@@ -138,6 +154,10 @@ const ExtractedItem = ({
     }
   };
 
+  const getFieldError = (fieldName: string) => {
+    return validationErrors.find(error => error.field === fieldName);
+  };
+
   return (
     <>
       <Card className={cn(
@@ -148,6 +168,20 @@ const ExtractedItem = ({
         <CardContent className="p-4">
           <div className="flex items-start space-x-3">
             <div className="flex flex-col gap-2">
+              {/* Show confidence score */}
+              <div className="text-xs text-center">
+                <Badge 
+                  variant="outline" 
+                  className={cn(
+                    "text-xs px-1",
+                    item.confidence >= 85 ? "bg-green-50 text-green-700 border-green-200" :
+                    item.confidence >= 70 ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                    "bg-red-50 text-red-700 border-red-200"
+                  )}
+                >
+                  {item.confidence}%
+                </Badge>
+              </div>
               {/* Single checkbox that shows completion status when approved and enabled */}
               {showCompletionToggle && item.approved ? (
                 <Checkbox
@@ -201,27 +235,63 @@ const ExtractedItem = ({
               
               {isEditing ? (
                 <div className="space-y-3">
-                  <Input
-                    value={editedItem.title}
-                    onChange={(e) => setEditedItem({...editedItem, title: e.target.value})}
-                    className="font-medium"
-                    placeholder="Enter title..."
-                  />
-                  {editedItem.description && (
-                    <Textarea
-                      value={editedItem.description}
-                      onChange={(e) => setEditedItem({...editedItem, description: e.target.value})}
-                      className="text-sm resize-none"
-                      rows={2}
-                      placeholder="Enter description..."
+                  <div>
+                    <Input
+                      value={editedItem.title}
+                      onChange={(e) => setEditedItem({...editedItem, title: e.target.value})}
+                      className={cn(
+                        "font-medium",
+                        getFieldError('title') && "border-red-500 focus:ring-red-500"
+                      )}
+                      placeholder="Enter title..."
                     />
+                    {getFieldError('title') && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center">
+                        <AlertCircle className="h-3 w-3 mr-1" />
+                        {getFieldError('title')?.message}
+                      </p>
+                    )}
+                  </div>
+                  
+                  {editedItem.description !== undefined && (
+                    <div>
+                      <Textarea
+                        value={editedItem.description || ''}
+                        onChange={(e) => setEditedItem({...editedItem, description: e.target.value})}
+                        className={cn(
+                          "text-sm resize-none",
+                          getFieldError('description') && "border-red-500 focus:ring-red-500"
+                        )}
+                        rows={2}
+                        placeholder="Enter description..."
+                      />
+                      {getFieldError('description') && (
+                        <p className="text-xs text-red-600 mt-1 flex items-center">
+                          <AlertCircle className="h-3 w-3 mr-1" />
+                          {getFieldError('description')?.message}
+                        </p>
+                      )}
+                    </div>
                   )}
+
+                  {validationErrors.length > 0 && (
+                    <div className="bg-red-50 border border-red-200 rounded-md p-2">
+                      <p className="text-xs text-red-800 font-medium mb-1">Please fix these errors:</p>
+                      {validationErrors.map((error, index) => (
+                        <p key={index} className="text-xs text-red-700">
+                          • {error.message}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                  
                   <div className="flex space-x-2">
                     <LoadingButton 
                       size="sm" 
                       onClick={handleSave}
                       loading={isLoading}
                       loadingText="Saving..."
+                      disabled={validationErrors.length > 0}
                     >
                       Save
                     </LoadingButton>
@@ -237,7 +307,15 @@ const ExtractedItem = ({
                 </div>
               ) : (
                 <>
-                  <h3 className="font-medium text-foreground leading-snug">{item.title}</h3>
+                  <div className="flex items-start justify-between">
+                    <h3 className="font-medium text-foreground leading-snug">{item.title}</h3>
+                    {item.confidence < 70 && (
+                      <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 ml-2">
+                        <AlertCircle className="h-3 w-3 mr-1" />
+                        Low confidence
+                      </Badge>
+                    )}
+                  </div>
                   {item.description && (
                     <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
                   )}

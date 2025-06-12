@@ -43,6 +43,13 @@ const getInitialState = (): AppState => ({
 export const useUserAppState = () => {
   const { user, isLoaded } = useUser();
   const [appState, setAppState] = useState<AppState>(getInitialState());
+  const [autoBackups, setAutoBackups] = useState<Array<{
+    id: string;
+    name: string;
+    timestamp: string;
+    itemCount: number;
+    data: AppState;
+  }>>([]);
 
   // Get user-specific storage key
   const getStorageKey = () => user ? `transcriptflow-${user.id}` : null;
@@ -93,6 +100,31 @@ export const useUserAppState = () => {
     }
   }, [appState, isLoaded, user]);
 
+  const createAutoBackup = (description: string) => {
+    if (!user) return;
+    
+    const backup = {
+      id: Date.now().toString(),
+      name: `Auto-backup: ${description}`,
+      timestamp: new Date().toISOString(),
+      itemCount: appState.extractedItems.length,
+      data: { ...appState }
+    };
+    
+    setAutoBackups(prev => {
+      const newBackups = [backup, ...prev.slice(0, 9)]; // Keep last 10 backups
+      localStorage.setItem(`transcriptflow-backups-${user.id}`, JSON.stringify(newBackups));
+      return newBackups;
+    });
+  };
+
+  const restoreFromBackup = (backupId: string) => {
+    const backup = autoBackups.find(b => b.id === backupId);
+    if (backup) {
+      setAppState(backup.data);
+    }
+  };
+
   const updateAutoSave = (enabled: boolean) => {
     const autoSaveKey = getAutoSaveKey();
     if (autoSaveKey) {
@@ -133,6 +165,7 @@ export const useUserAppState = () => {
   };
 
   const addProcessedTranscript = (metadata: Omit<TranscriptMetadata, 'id' | 'processedAt'>) => {
+    createAutoBackup('before adding transcript');
     const newMetadata: TranscriptMetadata = {
       ...metadata,
       id: Date.now().toString(),
@@ -152,7 +185,7 @@ export const useUserAppState = () => {
       ...item,
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
       extractedAt: new Date().toISOString(),
-      completed: false, // Add default completed state
+      completed: false,
     }));
 
     setAppState(prev => ({
@@ -180,6 +213,7 @@ export const useUserAppState = () => {
   };
 
   const clearAllData = () => {
+    createAutoBackup('before clearing all data');
     setAppState(getInitialState());
   };
 
@@ -211,6 +245,9 @@ export const useUserAppState = () => {
     deleteExtractedItem,
     clearAllData,
     updateAutoSave,
+    createAutoBackup,
+    restoreFromBackup,
+    autoBackups,
     isLoaded,
     user,
   };
