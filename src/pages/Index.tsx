@@ -43,13 +43,40 @@ const Index = () => {
 
     console.log('Filtered contacts with contact info:', validContacts);
 
-    // Helper function to generate realistic confidence scores
-    const getConfidenceScore = (type: string, hasDetails: boolean) => {
-      const baseScore = Math.floor(Math.random() * 20) + 75; // 75-95 range
-      if (type === 'contact' && hasDetails) return Math.min(baseScore + 10, 98);
-      if (type === 'task' && hasDetails) return Math.min(baseScore + 5, 95);
-      if (type === 'event' && hasDetails) return Math.min(baseScore + 8, 96);
-      return baseScore;
+    // Enhanced confidence score generation with more realistic variation
+    const getConfidenceScore = (type: string, item: any) => {
+      let baseScore = 60 + Math.floor(Math.random() * 30); // 60-90 base range
+      
+      // Type-specific adjustments
+      if (type === 'task') {
+        // Tasks with clear assignees and due dates get higher confidence
+        if (item.assignee) baseScore += 5;
+        if (item.dueDate) baseScore += 5;
+        if (item.description && item.description.length > 50) baseScore += 8;
+        if (item.priority === 'high') baseScore += 3;
+      } else if (type === 'contact') {
+        // Contacts with complete info get higher confidence
+        if (item.email && item.phone) baseScore += 15;
+        else if (item.email || item.phone) baseScore += 8;
+        if (item.role && item.company) baseScore += 10;
+        if (item.name && item.name.split(' ').length >= 2) baseScore += 5;
+      } else if (type === 'event') {
+        // Events with specific dates/times get higher confidence
+        if (item.date && item.time) baseScore += 12;
+        else if (item.date) baseScore += 6;
+        if (item.description && item.description.length > 30) baseScore += 5;
+      } else if (type === 'idea') {
+        // Ideas with detailed descriptions get higher confidence
+        if (item.description && item.description.length > 100) baseScore += 10;
+        else if (item.description && item.description.length > 50) baseScore += 5;
+      }
+      
+      // Add some randomness for realism
+      const randomAdjustment = Math.floor(Math.random() * 11) - 5; // -5 to +5
+      baseScore += randomAdjustment;
+      
+      // Ensure score stays within reasonable bounds
+      return Math.min(Math.max(baseScore, 45), 98);
     };
 
     // Add transcript metadata
@@ -61,7 +88,7 @@ const Index = () => {
         (extractedData.tasks?.length || 0) + 
         (extractedData.events?.length || 0) + 
         (extractedData.ideas?.length || 0) + 
-        validContacts.length, // Use filtered contacts count
+        validContacts.length,
       processingConfidence: Math.floor(Math.random() * 15) + 85, // 85-100 range
     });
 
@@ -77,7 +104,7 @@ const Index = () => {
         priority: task.priority || 'medium' as const,
         dueDate: task.dueDate,
         assignee: task.assignee,
-        confidence: getConfidenceScore('task', !!(task.description && task.dueDate)),
+        confidence: getConfidenceScore('task', task),
         approved: false,
         sourceTranscriptId: transcriptMetadataId,
       })),
@@ -88,7 +115,7 @@ const Index = () => {
         category: 'Business' as const,
         priority: 'medium' as const,
         dueDate: event.date && event.time ? `${event.date} ${event.time}` : event.date,
-        confidence: getConfidenceScore('event', !!(event.description && event.date)),
+        confidence: getConfidenceScore('event', event),
         approved: false,
         sourceTranscriptId: transcriptMetadataId,
       })),
@@ -98,7 +125,7 @@ const Index = () => {
         description: idea.description,
         category: 'Projects' as const,
         priority: 'medium' as const,
-        confidence: getConfidenceScore('idea', !!idea.description),
+        confidence: getConfidenceScore('idea', idea),
         approved: false,
         sourceTranscriptId: transcriptMetadataId,
       })),
@@ -110,13 +137,13 @@ const Index = () => {
                     `${contact.email || ''} ${contact.phone || ''}`.trim(),
         category: 'Business' as const,
         priority: 'low' as const,
-        confidence: getConfidenceScore('contact', !!(contact.email && contact.phone && contact.role)),
+        confidence: getConfidenceScore('contact', contact),
         approved: false,
         sourceTranscriptId: transcriptMetadataId,
       }))
     ];
 
-    console.log('Converted items:', allItems);
+    console.log('Converted items with varied confidence scores:', allItems);
 
     if (allItems.length > 0) {
       addExtractedItems(allItems);

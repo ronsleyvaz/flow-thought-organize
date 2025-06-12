@@ -1,4 +1,3 @@
-
 export interface ExtractedData {
   tasks: Array<{
     title: string;
