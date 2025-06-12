@@ -1,89 +1,93 @@
 
-import { FileText, Clock, CheckCircle, AlertCircle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Clock, CheckSquare, Calendar, Lightbulb, User, FileText } from 'lucide-react';
 
 interface ProcessingCardProps {
   transcript: {
     id: string;
     name: string;
-    status: 'processing' | 'completed' | 'review';
+    status: 'completed';
     extractedItems: number;
     timestamp: string;
     duration: string;
     type: 'meeting' | 'voice-memo' | 'brainstorm';
   };
+  onViewDetails?: (id: string) => void;
 }
 
-const ProcessingCard = ({ transcript }: ProcessingCardProps) => {
-  const getStatusIcon = () => {
-    switch (transcript.status) {
-      case 'processing':
-        return <Clock className="h-4 w-4 text-blue-500 animate-spin" />;
-      case 'completed':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'review':
-        return <AlertCircle className="h-4 w-4 text-orange-500" />;
-    }
-  };
-
-  const getStatusBadge = () => {
-    switch (transcript.status) {
-      case 'processing':
-        return <Badge variant="secondary">Processing</Badge>;
-      case 'completed':
-        return <Badge className="bg-green-100 text-green-700">Completed</Badge>;
-      case 'review':
-        return <Badge className="bg-orange-100 text-orange-700">Needs Review</Badge>;
+const ProcessingCard = ({ transcript, onViewDetails }: ProcessingCardProps) => {
+  const getTypeIcon = () => {
+    switch (transcript.type) {
+      case 'meeting':
+        return <User className="h-4 w-4" />;
+      case 'voice-memo':
+        return <FileText className="h-4 w-4" />;
+      case 'brainstorm':
+        return <Lightbulb className="h-4 w-4" />;
+      default:
+        return <FileText className="h-4 w-4" />;
     }
   };
 
   const getTypeColor = () => {
     switch (transcript.type) {
       case 'meeting':
-        return 'bg-blue-100 text-blue-700';
+        return 'text-primary';
       case 'voice-memo':
-        return 'bg-purple-100 text-purple-700';
+        return 'text-green-600';
       case 'brainstorm':
-        return 'bg-green-100 text-green-700';
+        return 'text-yellow-600';
+      default:
+        return 'text-muted-foreground';
     }
   };
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center">
-            <FileText className="h-5 w-5 mr-2 text-gray-600" />
-            {transcript.name}
-          </CardTitle>
-          {getStatusIcon()}
-        </div>
-        <div className="flex items-center space-x-2 text-sm text-gray-500">
-          <span>{transcript.timestamp}</span>
-          <span>•</span>
-          <span>{transcript.duration}</span>
-          <Badge variant="outline" className={getTypeColor()}>
-            {transcript.type}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            {getStatusBadge()}
-            {transcript.status !== 'processing' && (
-              <span className="text-sm text-gray-600">
-                {transcript.extractedItems} items extracted
-              </span>
-            )}
+    <Card className="transition-all duration-200 hover:shadow-md">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between">
+          <div className="flex-1 space-y-2">
+            <div className="flex items-center space-x-2">
+              <div className={`flex items-center ${getTypeColor()}`}>
+                {getTypeIcon()}
+                <span className="ml-1 text-xs font-medium uppercase tracking-wide">
+                  {transcript.type.replace('-', ' ')}
+                </span>
+              </div>
+              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                {transcript.status}
+              </Badge>
+            </div>
+            
+            <h3 className="font-medium text-foreground leading-snug">{transcript.name}</h3>
+            
+            <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+              <div className="flex items-center">
+                <Clock className="h-3 w-3 mr-1" />
+                {transcript.duration}
+              </div>
+              <div className="flex items-center">
+                <CheckSquare className="h-3 w-3 mr-1" />
+                {transcript.extractedItems} items
+              </div>
+              <div className="flex items-center">
+                <Calendar className="h-3 w-3 mr-1" />
+                {new Date(transcript.timestamp).toLocaleDateString()}
+              </div>
+            </div>
           </div>
-          {transcript.status === 'review' && (
-            <Button size="sm">Review Items</Button>
-          )}
-          {transcript.status === 'completed' && (
-            <Button variant="outline" size="sm">View Details</Button>
+          
+          {onViewDetails && (
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => onViewDetails(transcript.id)}
+              className="ml-4 transition-all duration-200 hover:bg-accent"
+            >
+              View Details
+            </Button>
           )}
         </div>
       </CardContent>
