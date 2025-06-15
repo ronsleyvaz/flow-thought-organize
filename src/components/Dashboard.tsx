@@ -46,28 +46,6 @@ const Dashboard = ({
   addExtractedItems,
   apiKey
 }: DashboardProps) => {
-  // --- Fix noteForm types ---
-  type NoteType = 'event' | 'idea' | 'contact';
-  type NoteCategory = 'Business' | 'Personal' | 'Home' | 'Projects';
-  type NotePriority = 'low' | 'medium' | 'high';
-
-  const [mainTab, setMainTab] = useState<'todos' | 'notes'>('todos');
-  const [isAddNoteOpen, setIsAddNoteOpen] = useState(false);
-
-  // Explicitly type the note form state to use only allowed literals
-  const [noteForm, setNoteForm] = useState<{
-    type: NoteType;
-    title: string;
-    description: string;
-    category: NoteCategory;
-    priority: NotePriority;
-  }>({
-    type: 'event',
-    title: '',
-    description: '',
-    category: 'Business',
-    priority: 'medium'
-  });
   const [activeTab, setActiveTab] = useState('all');
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedTranscript, setSelectedTranscript] = useState<string | null>(null);
@@ -79,10 +57,6 @@ const Dashboard = ({
   const filteredItems = activeCategory && activeCategory !== 'all' 
     ? extractedItems.filter(item => item.category === activeCategory)
     : extractedItems;
-
-  // Filter items
-  const todos = appState.extractedItems.filter(item => item.type === 'task');
-  const notes = appState.extractedItems.filter(item => item.type !== 'task');
 
   const getItemsByType = (type: string) => {
     const baseItems = filteredItems;
@@ -109,46 +83,6 @@ const Dashboard = ({
   const getTranscriptName = (transcriptId: string) => {
     const transcript = transcriptMetadata.find(t => t.id === transcriptId);
     return transcript ? transcript.name : 'Unknown Transcript';
-  };
-
-  // New: handle add/edit/delete for notes
-  const handleOpenAddNote = () => {
-    setIsAddNoteOpen(true);
-    setNoteForm({type: 'event', title: '', description: '', category: 'Business', priority: 'medium'});
-  };
-  const handleCloseAddNote = () => setIsAddNoteOpen(false);
-
-  // --- Fix handleNoteFormChange to use correct type values ---
-  // We need type guards to ensure only allowed union values
-  const handleNoteFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    if (name === 'type' && ['event', 'idea', 'contact'].includes(value)) {
-      setNoteForm((prev) => ({ ...prev, type: value as NoteType }));
-    } else if (name === 'category' && ['Business', 'Personal', 'Home', 'Projects'].includes(value)) {
-      setNoteForm((prev) => ({ ...prev, category: value as NoteCategory }));
-    } else if (name === 'priority' && ['low', 'medium', 'high'].includes(value)) {
-      setNoteForm((prev) => ({ ...prev, priority: value as NotePriority }));
-    } else {
-      setNoteForm((prev) => ({ ...prev, [name]: value }));
-    }
-  };
-
-  // --- Fix handleAddNote to pass the right types ---
-  const handleAddNote = () => {
-    addExtractedItems([
-      {
-        type: noteForm.type,
-        title: noteForm.title,
-        description: noteForm.description,
-        category: noteForm.category,
-        priority: noteForm.priority,
-        confidence: 90,
-        approved: false,
-        completed: false,
-        sourceTranscriptId: '', // Not from a transcript
-      }
-    ]);
-    setIsAddNoteOpen(false);
   };
 
   const processTextWithOpenAI = async (text: string, fileName: string) => {
@@ -460,138 +394,74 @@ const Dashboard = ({
         </Card>
       )}
 
-      {/* Tabs for Todos & Notes */}
-      <div className="mb-4 flex border-b">
-        <button
-          className={`px-4 py-2 font-semibold ${mainTab === "todos" ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500"}`}
-          onClick={() => setMainTab('todos')}
-        >
-          Todos
-        </button>
-        <button
-          className={`ml-2 px-4 py-2 font-semibold ${mainTab === "notes" ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500"}`}
-          onClick={() => setMainTab('notes')}
-        >
-          Notes
-        </button>
-      </div>
+      {/* Stats Overview */}
+      <StatsOverview
+        filteredItems={filteredItems}
+        transcriptMetadata={transcriptMetadata}
+      />
 
-      {mainTab === 'todos' && (
-        <>
-          {/* Existing Todos List (use SortableItemsList as before) */}
-          <SortableItemsList
-            items={todos}
-            onToggleApproval={toggleItemApproval}
-            onToggleCompletion={toggleItemCompletion}
-            onEdit={editExtractedItem}
-            onDelete={deleteExtractedItem}
-            getTranscriptName={id => {
-              const t = appState.transcriptMetadata.find(t => t.id === id);
-              return t ? t.name : '';
-            }}
-            type="task"
-          />
-        </>
-      )}
-      {mainTab === 'notes' && (
-        <div>
-          <div className="flex justify-end mb-4">
-            <button
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-              onClick={handleOpenAddNote}
-            >
-              Add Note
-            </button>
-          </div>
-          {/* Notes List */}
-          <SortableItemsList
-            items={notes}
-            onToggleApproval={toggleItemApproval}
-            onToggleCompletion={toggleItemCompletion}
-            onEdit={editExtractedItem}
-            onDelete={deleteExtractedItem}
-            getTranscriptName={id => {
-              const t = appState.transcriptMetadata.find(t => t.id === id);
-              return t ? t.name : '';
-            }}
-            type="note"
-          />
-          {/* AddNote Modal */}
-          {isAddNoteOpen && (
-            <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-              <div className="bg-white rounded shadow-lg p-6 min-w-[320px]">
-                <h2 className="font-bold mb-2">Add Note</h2>
-                <div className="space-y-2">
-                  <label className="block">
-                    Type:
-                    <select
-                      name="type"
-                      className="w-full mt-1 border rounded px-2 py-1"
-                      value={noteForm.type}
-                      onChange={handleNoteFormChange}
-                    >
-                      <option value="event">Event</option>
-                      <option value="idea">Idea</option>
-                      <option value="contact">Contact</option>
-                    </select>
-                  </label>
-                  <label className="block">
-                    Title:
-                    <input
-                      name="title"
-                      className="w-full mt-1 border rounded px-2 py-1"
-                      value={noteForm.title}
-                      onChange={handleNoteFormChange}
-                    />
-                  </label>
-                  <label className="block">
-                    Description:
-                    <textarea
-                      name="description"
-                      className="w-full mt-1 border rounded px-2 py-1"
-                      value={noteForm.description}
-                      onChange={handleNoteFormChange}
-                    />
-                  </label>
-                  <label className="block">
-                    Category:
-                    <select
-                      name="category"
-                      className="w-full mt-1 border rounded px-2 py-1"
-                      value={noteForm.category}
-                      onChange={handleNoteFormChange}
-                    >
-                      <option value="Business">Business</option>
-                      <option value="Personal">Personal</option>
-                      <option value="Home">Home</option>
-                      <option value="Projects">Projects</option>
-                    </select>
-                  </label>
-                  <label className="block">
-                    Priority:
-                    <select
-                      name="priority"
-                      className="w-full mt-1 border rounded px-2 py-1"
-                      value={noteForm.priority}
-                      onChange={handleNoteFormChange}
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                    </select>
-                  </label>
-                  <div className="flex mt-4 gap-2">
-                    <button onClick={handleAddNote} className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600">
-                      Add
-                    </button>
-                    <button onClick={handleCloseAddNote} className="bg-gray-200 px-3 py-1 rounded">Cancel</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Input Methods */}
+      <InputMethods
+        onTextProcessed={processTextWithOpenAI}
+        onFileProcessed={processTextWithOpenAI}
+        onAudioProcessed={processAudioFileWithOpenAI}
+        onRecordingProcessed={processAudioRecordingWithOpenAI}
+        onTranscribedTextProcessed={processTranscribedTextWithOpenAI}
+        apiKey={apiKey}
+        liveRecorderRef={liveRecorderRef}
+      />
+
+      {/* State Management */}
+      <CollapsibleSection title="State Management" icon={<Settings className="h-5 w-5 mr-2" />} defaultCollapsed={true}>
+        <StateManager
+          onExport={exportState}
+          onImport={importState}
+          onClear={clearAllData}
+          lastSaved={appState.lastSaved}
+        />
+      </CollapsibleSection>
+
+      {/* Main Content Tabs */}
+      <CollapsibleSection title="Extracted Items" icon={<List className="h-5 w-5 mr-2" />} defaultCollapsed={true}>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="all">All Items</TabsTrigger>
+            <TabsTrigger value="task">Tasks</TabsTrigger>
+            <TabsTrigger value="event">Events</TabsTrigger>
+            <TabsTrigger value="idea">Ideas</TabsTrigger>
+            <TabsTrigger value="contact">Contacts</TabsTrigger>
+          </TabsList>
+          
+          {['all', 'task', 'event', 'idea', 'contact'].map((type) => (
+            <TabsContent key={type} value={type} className="space-y-4">
+              <SortableItemsList
+                items={getItemsByType(type)}
+                onToggleApproval={toggleItemApproval}
+                onToggleCompletion={toggleItemCompletion}
+                onEdit={editExtractedItem}
+                onDelete={deleteExtractedItem}
+                getTranscriptName={getTranscriptName}
+                type={type}
+                category={activeCategory}
+              />
+            </TabsContent>
+          ))}
+        </Tabs>
+      </CollapsibleSection>
+
+      {/* Recent Activity */}
+      <RecentActivity
+        recentTranscripts={recentTranscripts}
+        filteredItems={filteredItems}
+        onViewTranscriptDetails={handleViewTranscriptDetails}
+        onToggleApproval={toggleItemApproval}
+        onToggleCompletion={toggleItemCompletion}
+        onEditItem={editExtractedItem}
+        onDeleteItem={deleteExtractedItem}
+        getTranscriptName={getTranscriptName}
+        setActiveTab={setActiveTab}
+        onShowAllItems={handleShowAllItems}
+      />
     </div>
   );
 };
