@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ProcessingCard from './ProcessingCard';
 import TranscriptDetailView from './TranscriptDetailView';
-import InputMethods from './InputMethods';
 import CollapsibleSection from './CollapsibleSection';
 import SortableItemsList from './SortableItemsList';
 import StatsOverview from './StatsOverview';
@@ -398,17 +397,6 @@ const Dashboard = ({
       <StatsOverview
         filteredItems={filteredItems}
         transcriptMetadata={transcriptMetadata}
-      />
-
-      {/* Input Methods */}
-      <InputMethods
-        onTextProcessed={processTextWithOpenAI}
-        onFileProcessed={processTextWithOpenAI}
-        onAudioProcessed={processAudioFileWithOpenAI}
-        onRecordingProcessed={processAudioRecordingWithOpenAI}
-        onTranscribedTextProcessed={processTranscribedTextWithOpenAI}
-        apiKey={apiKey}
-        liveRecorderRef={liveRecorderRef}
       />
 
       {/* State Management */}

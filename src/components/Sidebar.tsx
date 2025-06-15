@@ -1,5 +1,4 @@
-
-import { FileText, CheckSquare, Calendar, Lightbulb, Users, Home, Briefcase, FolderOpen, Settings } from 'lucide-react';
+import { FileText, CheckSquare, Calendar, Lightbulb, Users, Home, Briefcase, FolderOpen, Settings, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AppState } from '@/hooks/useUserAppState';
 
@@ -12,16 +11,6 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ activeView = 'dashboard', activeCategory, onViewChange, onCategoryChange, appState }: SidebarProps) => {
-  const navigation = [
-    { name: 'Dashboard', key: 'dashboard', icon: Home },
-    { name: 'Recent Transcripts', key: 'transcripts', icon: FileText },
-    { name: 'Tasks', key: 'task', icon: CheckSquare },
-    { name: 'Calendar Events', key: 'event', icon: Calendar },
-    { name: 'Ideas', key: 'idea', icon: Lightbulb },
-    { name: 'Contacts', key: 'contact', icon: Users },
-    { name: 'Settings', key: 'settings', icon: Settings },
-  ];
-
   // Calculate actual counts from appState
   const extractedItems = appState?.extractedItems || [];
   
@@ -37,6 +26,18 @@ const Sidebar = ({ activeView = 'dashboard', activeCategory, onViewChange, onCat
     { name: 'Personal', key: 'Personal', icon: Users, count: personalCount, color: 'bg-green-100 text-green-700' },
     { name: 'Home', key: 'Home', icon: Home, count: homeCount, color: 'bg-purple-100 text-purple-700' },
     { name: 'Projects', key: 'Projects', icon: FolderOpen, count: projectsCount, color: 'bg-orange-100 text-orange-700' },
+  ];
+
+  // Insert the "Inputs" tab above Settings in navigation
+  const navigation = [
+    { name: 'Dashboard', key: 'dashboard', icon: Home },
+    { name: 'Recent Transcripts', key: 'transcripts', icon: FileText },
+    { name: 'Tasks', key: 'task', icon: CheckSquare },
+    { name: 'Calendar Events', key: 'event', icon: Calendar },
+    { name: 'Ideas', key: 'idea', icon: Lightbulb },
+    { name: 'Contacts', key: 'contact', icon: Users },
+    { name: 'Inputs', key: 'inputs', icon: Upload }, // Inputs tab, using Upload icon for now
+    { name: 'Settings', key: 'settings', icon: Settings }, // Settings last
   ];
 
   return (
