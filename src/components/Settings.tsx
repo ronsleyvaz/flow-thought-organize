@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,27 +6,16 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Eye, EyeOff, Save, Key, Trash2, Database } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import StateManager from './StateManager';
+import FirefliesIntegration from './FirefliesIntegration';
 
 interface SettingsProps {
   onApiKeyChange: (apiKey: string) => void;
+  onFirefliesTranscriptProcessed: (extractedData: any, transcriptId: string) => void;
   autoSave: boolean;
   onAutoSaveChange: (enabled: boolean) => void;
-  exportState: () => void;
-  importState: (file: File) => void;
-  clearAllData: () => void;
-  lastSaved?: string;
 }
 
-const Settings = ({
-  onApiKeyChange,
-  autoSave,
-  onAutoSaveChange,
-  exportState,
-  importState,
-  clearAllData,
-  lastSaved,
-}: SettingsProps) => {
+const Settings = ({ onApiKeyChange, onFirefliesTranscriptProcessed, autoSave, onAutoSaveChange }: SettingsProps) => {
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [apiKeySaved, setApiKeySaved] = useState(false);
@@ -50,10 +38,12 @@ const Settings = ({
       });
       return;
     }
+
     localStorage.setItem('openai_api_key', apiKey);
     onApiKeyChange(apiKey);
     setApiKeySaved(true);
     setTimeout(() => setApiKeySaved(false), 2000);
+    
     toast({
       title: "API Key Saved",
       description: "OpenAI API key saved successfully",
@@ -64,6 +54,7 @@ const Settings = ({
     localStorage.removeItem('openai_api_key');
     setApiKey('');
     onApiKeyChange('');
+    
     toast({
       title: "API Key Cleared",
       description: "OpenAI API key has been removed",
@@ -168,12 +159,10 @@ const Settings = ({
         </CardContent>
       </Card>
 
-      {/* State Management Section */}
-      <StateManager
-        onExport={exportState}
-        onImport={importState}
-        onClear={clearAllData}
-        lastSaved={lastSaved}
+      {/* Fireflies Integration */}
+      <FirefliesIntegration 
+        onTranscriptProcessed={onFirefliesTranscriptProcessed}
+        apiKey={apiKey}
       />
     </div>
   );

@@ -3,7 +3,6 @@ import Settings from '@/components/Settings';
 import HowToUse from '@/components/HowToUse';
 import { AppState, ExtractedItem } from '@/hooks/useUserAppState';
 import InputsPage from './InputsPage';
-import StateManager from '@/components/StateManager';
 
 interface MainContentProps {
   activeView: string;
@@ -75,19 +74,16 @@ const MainContent = ({
       return <HowToUse />;
     case 'settings':
       return (
-        <Settings
-          onApiKeyChange={onApiKeyChange}
+        <Settings 
+          onApiKeyChange={onApiKeyChange} 
+          onFirefliesTranscriptProcessed={onFirefliesTranscriptProcessed}
           autoSave={appState.autoSave}
           onAutoSaveChange={updateAutoSave}
-          exportState={exportState}
-          importState={importState}
-          clearAllData={clearAllData}
-          lastSaved={appState.lastSaved}
         />
       );
     default:
       return (
-        <Dashboard
+        <Dashboard 
           activeCategory={activeCategory === 'all' ? undefined : activeCategory}
           activeView={activeView}
           appState={appState}
