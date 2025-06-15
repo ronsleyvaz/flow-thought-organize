@@ -80,7 +80,6 @@ const Dashboard = ({
           <Card key={index}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">{stat.label}</CardTitle>
-              {/* @ts-expect-error */}
               <stat.icon className="h-4 w-4 text-gray-500" />
             </CardHeader>
             <CardContent>
