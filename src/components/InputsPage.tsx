@@ -1,4 +1,5 @@
 
+import React from 'react';
 import InputMethods from './InputMethods';
 import FirefliesIntegration from './FirefliesIntegration';
 import { AppState } from '@/hooks/useUserAppState';
@@ -39,12 +40,12 @@ const InputsPage = ({
         liveRecorderRef={liveRecorderRef}
       />
       <FirefliesIntegration
-        appState={appState}
         apiKey={apiKey}
-        onFirefliesTranscriptProcessed={onFirefliesTranscriptProcessed}
+        onTranscriptProcessed={onFirefliesTranscriptProcessed}
       />
     </div>
   );
 };
 
 export default InputsPage;
+
