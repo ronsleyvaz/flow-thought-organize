@@ -46,9 +46,28 @@ const Dashboard = ({
   addExtractedItems,
   apiKey
 }: DashboardProps) => {
+  // --- Fix noteForm types ---
+  type NoteType = 'event' | 'idea' | 'contact';
+  type NoteCategory = 'Business' | 'Personal' | 'Home' | 'Projects';
+  type NotePriority = 'low' | 'medium' | 'high';
+
   const [mainTab, setMainTab] = useState<'todos' | 'notes'>('todos');
   const [isAddNoteOpen, setIsAddNoteOpen] = useState(false);
-  const [noteForm, setNoteForm] = useState({type: 'event', title: '', description: '', category: 'Business', priority: 'medium'});
+
+  // Explicitly type the note form state to use only allowed literals
+  const [noteForm, setNoteForm] = useState<{
+    type: NoteType;
+    title: string;
+    description: string;
+    category: NoteCategory;
+    priority: NotePriority;
+  }>({
+    type: 'event',
+    title: '',
+    description: '',
+    category: 'Business',
+    priority: 'medium'
+  });
   const [activeTab, setActiveTab] = useState('all');
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedTranscript, setSelectedTranscript] = useState<string | null>(null);
@@ -99,15 +118,30 @@ const Dashboard = ({
   };
   const handleCloseAddNote = () => setIsAddNoteOpen(false);
 
+  // --- Fix handleNoteFormChange to use correct type values ---
+  // We need type guards to ensure only allowed union values
   const handleNoteFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setNoteForm({...noteForm, [e.target.name]: e.target.value});
+    const { name, value } = e.target;
+    if (name === 'type' && ['event', 'idea', 'contact'].includes(value)) {
+      setNoteForm((prev) => ({ ...prev, type: value as NoteType }));
+    } else if (name === 'category' && ['Business', 'Personal', 'Home', 'Projects'].includes(value)) {
+      setNoteForm((prev) => ({ ...prev, category: value as NoteCategory }));
+    } else if (name === 'priority' && ['low', 'medium', 'high'].includes(value)) {
+      setNoteForm((prev) => ({ ...prev, priority: value as NotePriority }));
+    } else {
+      setNoteForm((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
+  // --- Fix handleAddNote to pass the right types ---
   const handleAddNote = () => {
-    // Add to extractedItems, as non-task
     addExtractedItems([
       {
-        ...noteForm,
+        type: noteForm.type,
+        title: noteForm.title,
+        description: noteForm.description,
+        category: noteForm.category,
+        priority: noteForm.priority,
         confidence: 90,
         approved: false,
         completed: false,
