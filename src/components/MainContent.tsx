@@ -1,8 +1,10 @@
+
 import Dashboard from '@/components/Dashboard';
 import Settings from '@/components/Settings';
 import HowToUse from '@/components/HowToUse';
 import { AppState, ExtractedItem } from '@/hooks/useUserAppState';
 import InputsPage from './InputsPage';
+import { useContentHandlers } from '@/hooks/useContentHandlers';
 
 interface MainContentProps {
   activeView: string;
@@ -41,32 +43,25 @@ const MainContent = ({
   onFirefliesTranscriptProcessed,
   updateAutoSave,
 }: MainContentProps) => {
+  const {
+    handleTextProcessed,
+    handleFileProcessed,
+    handleAudioProcessed,
+    handleRecordingProcessed,
+    handleTranscribedTextProcessed,
+  } = useContentHandlers(addProcessedTranscript, addExtractedItems, apiKey);
+
   switch (activeView) {
     case 'inputs':
       return (
         <InputsPage
           appState={appState}
           apiKey={apiKey}
-          onTextProcessed={(text: string, fileName: string) => {
-            // Type assertion to match the expected type
-            return (MainContent as any).prototype.onTextProcessed(text, fileName);
-          }}
-          onFileProcessed={(text: string, fileName: string) => {
-            // Type assertion to match the expected type
-            return (MainContent as any).prototype.onFileProcessed(text, fileName);
-          }}
-          onAudioProcessed={(audioFile: File, fileName: string) => {
-            // Type assertion to match the expected type
-            return (MainContent as any).prototype.onAudioProcessed(audioFile, fileName);
-          }}
-          onRecordingProcessed={(audioBlob: Blob, fileName: string) => {
-            // Type assertion to match the expected type
-            return (MainContent as any).prototype.onRecordingProcessed(audioBlob, fileName);
-          }}
-          onTranscribedTextProcessed={(text: string, fileName: string) => {
-            // Type assertion to match the expected type
-            return (MainContent as any).prototype.onTranscribedTextProcessed(text, fileName);
-          }}
+          onTextProcessed={handleTextProcessed}
+          onFileProcessed={handleFileProcessed}
+          onAudioProcessed={handleAudioProcessed}
+          onRecordingProcessed={handleRecordingProcessed}
+          onTranscribedTextProcessed={handleTranscribedTextProcessed}
           onFirefliesTranscriptProcessed={onFirefliesTranscriptProcessed}
         />
       );
@@ -76,7 +71,10 @@ const MainContent = ({
       return (
         <Settings 
           onApiKeyChange={onApiKeyChange} 
-          onFirefliesTranscriptProcessed={onFirefliesTranscriptProcessed}
+          appState={appState}
+          exportState={exportState}
+          importState={importState}
+          clearAllData={clearAllData}
           autoSave={appState.autoSave}
           onAutoSaveChange={updateAutoSave}
         />
@@ -87,15 +85,10 @@ const MainContent = ({
           activeCategory={activeCategory === 'all' ? undefined : activeCategory}
           activeView={activeView}
           appState={appState}
-          exportState={exportState}
-          importState={importState}
           toggleItemApproval={toggleItemApproval}
           toggleItemCompletion={toggleItemCompletion}
           editExtractedItem={editExtractedItem}
           deleteExtractedItem={deleteExtractedItem}
-          clearAllData={clearAllData}
-          addProcessedTranscript={addProcessedTranscript}
-          addExtractedItems={addExtractedItems}
           apiKey={apiKey}
         />
       );
