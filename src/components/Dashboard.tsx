@@ -13,6 +13,9 @@ import StateManager from './StateManager';
 import { AppState, ExtractedItem as ExtractedItemType, TranscriptMetadata } from '@/hooks/useUserAppState';
 import { extractItemsFromText, transcribeAudio } from '@/services/openaiService';
 import { CheckSquare, Calendar, Lightbulb, User, FileText, Settings, List } from 'lucide-react';
+import { BatchSelectionProvider } from '@/contexts/BatchSelectionContext';
+import BatchOperationsToolbar from './BatchOperationsToolbar';
+import ExtractedItemWithSelection from './ExtractedItemWithSelection';
 
 interface DashboardProps {
   activeCategory?: string;
@@ -369,88 +372,90 @@ const Dashboard = ({
 
   // Default dashboard view
   return (
-    <div className="p-6 space-y-6">
-      {/* API Key Warning */}
-      {!apiKey && (
-        <Card className="border-yellow-200 bg-yellow-50">
-          <CardContent className="p-4">
-            <p className="text-yellow-800 text-sm">
-              Please configure your OpenAI API key in Settings to enable transcript processing.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+    <BatchSelectionProvider>
+      <div className="p-6 space-y-6">
+        {/* API Key Warning */}
+        {!apiKey && (
+          <Card className="border-yellow-200 bg-yellow-50">
+            <CardContent className="p-4">
+              <p className="text-yellow-800 text-sm">
+                Please configure your OpenAI API key in Settings to enable transcript processing.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Processing Indicator */}
-      {isProcessing && (
-        <Card className="border-blue-200 bg-blue-50">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <div className="animate-spin h-4 w-4 border-b-2 border-blue-600 rounded-full"></div>
-              <p className="text-blue-800 text-sm">Processing with OpenAI...</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+        {/* Processing Indicator */}
+        {isProcessing && (
+          <Card className="border-blue-200 bg-blue-50">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin h-4 w-4 border-b-2 border-blue-600 rounded-full"></div>
+                <p className="text-blue-800 text-sm">Processing with OpenAI...</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Stats Overview */}
-      <StatsOverview
-        filteredItems={filteredItems}
-        transcriptMetadata={transcriptMetadata}
-      />
-
-      {/* State Management */}
-      <CollapsibleSection title="State Management" icon={<Settings className="h-5 w-5 mr-2" />} defaultCollapsed={true}>
-        <StateManager
-          onExport={exportState}
-          onImport={importState}
-          onClear={clearAllData}
-          lastSaved={appState.lastSaved}
+        {/* Stats Overview */}
+        <StatsOverview
+          filteredItems={filteredItems}
+          transcriptMetadata={transcriptMetadata}
         />
-      </CollapsibleSection>
 
-      {/* Main Content Tabs */}
-      <CollapsibleSection title="Extracted Items" icon={<List className="h-5 w-5 mr-2" />} defaultCollapsed={true}>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="all">All Items</TabsTrigger>
-            <TabsTrigger value="task">Tasks</TabsTrigger>
-            <TabsTrigger value="event">Events</TabsTrigger>
-            <TabsTrigger value="idea">Ideas</TabsTrigger>
-            <TabsTrigger value="contact">Contacts</TabsTrigger>
-          </TabsList>
-          
-          {['all', 'task', 'event', 'idea', 'contact'].map((type) => (
-            <TabsContent key={type} value={type} className="space-y-4">
-              <SortableItemsList
-                items={getItemsByType(type)}
-                onToggleApproval={toggleItemApproval}
-                onToggleCompletion={toggleItemCompletion}
-                onEdit={editExtractedItem}
-                onDelete={deleteExtractedItem}
-                getTranscriptName={getTranscriptName}
-                type={type}
-                category={activeCategory}
-              />
-            </TabsContent>
-          ))}
-        </Tabs>
-      </CollapsibleSection>
+        {/* State Management */}
+        <CollapsibleSection title="State Management" icon={<Settings className="h-5 w-5 mr-2" />} defaultCollapsed={true}>
+          <StateManager
+            onExport={exportState}
+            onImport={importState}
+            onClear={clearAllData}
+            lastSaved={appState.lastSaved}
+          />
+        </CollapsibleSection>
 
-      {/* Recent Activity */}
-      <RecentActivity
-        recentTranscripts={recentTranscripts}
-        filteredItems={filteredItems}
-        onViewTranscriptDetails={handleViewTranscriptDetails}
-        onToggleApproval={toggleItemApproval}
-        onToggleCompletion={toggleItemCompletion}
-        onEditItem={editExtractedItem}
-        onDeleteItem={deleteExtractedItem}
-        getTranscriptName={getTranscriptName}
-        setActiveTab={setActiveTab}
-        onShowAllItems={handleShowAllItems}
-      />
-    </div>
+        {/* Main Content Tabs */}
+        <CollapsibleSection title="Extracted Items" icon={<List className="h-5 w-5 mr-2" />} defaultCollapsed={true}>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-5">
+              <TabsTrigger value="all">All Items</TabsTrigger>
+              <TabsTrigger value="task">Tasks</TabsTrigger>
+              <TabsTrigger value="event">Events</TabsTrigger>
+              <TabsTrigger value="idea">Ideas</TabsTrigger>
+              <TabsTrigger value="contact">Contacts</TabsTrigger>
+            </TabsList>
+            
+            {['all', 'task', 'event', 'idea', 'contact'].map((type) => (
+              <TabsContent key={type} value={type} className="space-y-4">
+                <SortableItemsList
+                  items={getItemsByType(type)}
+                  onToggleApproval={toggleItemApproval}
+                  onToggleCompletion={toggleItemCompletion}
+                  onEdit={editExtractedItem}
+                  onDelete={deleteExtractedItem}
+                  getTranscriptName={getTranscriptName}
+                  type={type}
+                  category={activeCategory}
+                />
+              </TabsContent>
+            ))}
+          </Tabs>
+        </CollapsibleSection>
+
+        {/* Recent Activity */}
+        <RecentActivity
+          recentTranscripts={recentTranscripts}
+          filteredItems={filteredItems}
+          onViewTranscriptDetails={handleViewTranscriptDetails}
+          onToggleApproval={toggleItemApproval}
+          onToggleCompletion={toggleItemCompletion}
+          onEditItem={editExtractedItem}
+          onDeleteItem={deleteExtractedItem}
+          getTranscriptName={getTranscriptName}
+          setActiveTab={setActiveTab}
+          onShowAllItems={handleShowAllItems}
+        />
+      </div>
+    </BatchSelectionProvider>
   );
 };
 

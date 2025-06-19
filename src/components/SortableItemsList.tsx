@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import ExtractedItem from './ExtractedItem';
 import EmptyState from './EmptyState';
 import { ExtractedItem as ExtractedItemType } from '@/hooks/useUserAppState';
 import { ArrowUpDown, ArrowUp, ArrowDown, CheckSquare, Clock } from 'lucide-react';
+import { BatchSelectionProvider } from '@/contexts/BatchSelectionContext';
+import BatchOperationsToolbar from './BatchOperationsToolbar';
+import ExtractedItemWithSelection from './ExtractedItemWithSelection';
 
 interface SortableItemsListProps {
   items: ExtractedItemType[];
@@ -82,6 +84,29 @@ const SortableItemsList = ({
     });
   };
 
+  const handleBatchApprove = (ids: string[]) => {
+    ids.forEach(id => onToggleApproval(id));
+  };
+
+  const handleBatchReject = (ids: string[]) => {
+    ids.forEach(id => onDelete(id));
+  };
+
+  const handleBatchDelete = (ids: string[]) => {
+    ids.forEach(id => onDelete(id));
+  };
+
+  const handleBatchComplete = (ids: string[]) => {
+    if (onToggleCompletion) {
+      ids.forEach(id => {
+        const item = items.find(i => i.id === id);
+        if (item?.approved && !item.completed) {
+          onToggleCompletion(id);
+        }
+      });
+    }
+  };
+
   const renderItemsList = (itemsToRender: ExtractedItemType[], showCompletionToggle: boolean = false) => {
     if (itemsToRender.length === 0) {
       const emptyMessage = activeTab === 'completed' 
@@ -103,87 +128,99 @@ const SortableItemsList = ({
     const sortedItems = sortItems(itemsToRender);
 
     return (
-      <div className="space-y-3">
-        {sortedItems.map((item) => (
-          <ExtractedItem
-            key={item.id}
-            item={item}
-            onToggleApproval={onToggleApproval}
-            onToggleCompletion={onToggleCompletion}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            transcriptName={getTranscriptName(item.sourceTranscriptId)}
-            showCompletionToggle={showCompletionToggle}
-          />
-        ))}
+      <div className="space-y-4">
+        <BatchOperationsToolbar
+          items={sortedItems}
+          onBatchApprove={handleBatchApprove}
+          onBatchReject={handleBatchReject}
+          onBatchDelete={handleBatchDelete}
+          onBatchComplete={handleBatchComplete}
+        />
+        <div className="space-y-3">
+          {sortedItems.map((item) => (
+            <ExtractedItemWithSelection
+              key={item.id}
+              item={item}
+              onToggleApproval={onToggleApproval}
+              onToggleCompletion={onToggleCompletion}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onReject={onDelete}
+              transcriptName={getTranscriptName(item.sourceTranscriptId)}
+              showCompletionToggle={showCompletionToggle}
+            />
+          ))}
+        </div>
       </div>
     );
   };
 
   return (
-    <div className="space-y-4">
-      {/* Sort Controls */}
-      <div className="flex flex-wrap gap-2 pb-4 border-b">
-        <span className="text-sm font-medium text-muted-foreground mr-2">Sort by:</span>
-        <Button
-          variant={sortField === 'priority' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => handleSort('priority')}
-          className="flex items-center gap-1"
-        >
-          Priority {getSortIcon('priority')}
-        </Button>
-        <Button
-          variant={sortField === 'title' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => handleSort('title')}
-          className="flex items-center gap-1"
-        >
-          Name {getSortIcon('title')}
-        </Button>
-        <Button
-          variant={sortField === 'extractedAt' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => handleSort('extractedAt')}
-          className="flex items-center gap-1"
-        >
-          Extracted Date {getSortIcon('extractedAt')}
-        </Button>
-        <Button
-          variant={sortField === 'dueDate' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => handleSort('dueDate')}
-          className="flex items-center gap-1"
-        >
-          Due Date {getSortIcon('dueDate')}
-        </Button>
-        <Badge variant="outline" className="ml-auto">
-          {items.length} total
-        </Badge>
-      </div>
+    <BatchSelectionProvider>
+      <div className="space-y-4">
+        {/* Sort Controls */}
+        <div className="flex flex-wrap gap-2 pb-4 border-b">
+          <span className="text-sm font-medium text-muted-foreground mr-2">Sort by:</span>
+          <Button
+            variant={sortField === 'priority' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleSort('priority')}
+            className="flex items-center gap-1"
+          >
+            Priority {getSortIcon('priority')}
+          </Button>
+          <Button
+            variant={sortField === 'title' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleSort('title')}
+            className="flex items-center gap-1"
+          >
+            Name {getSortIcon('title')}
+          </Button>
+          <Button
+            variant={sortField === 'extractedAt' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleSort('extractedAt')}
+            className="flex items-center gap-1"
+          >
+            Extracted Date {getSortIcon('extractedAt')}
+          </Button>
+          <Button
+            variant={sortField === 'dueDate' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleSort('dueDate')}
+            className="flex items-center gap-1"
+          >
+            Due Date {getSortIcon('dueDate')}
+          </Button>
+          <Badge variant="outline" className="ml-auto">
+            {items.length} total
+          </Badge>
+        </div>
 
-      {/* Active/Completed Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="active" className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            Active ({activeItems.length})
-          </TabsTrigger>
-          <TabsTrigger value="completed" className="flex items-center gap-2">
-            <CheckSquare className="h-4 w-4" />
-            Completed ({completedItems.length})
-          </TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="active" className="space-y-4">
-          {renderItemsList(activeItems, true)}
-        </TabsContent>
-        
-        <TabsContent value="completed" className="space-y-4">
-          {renderItemsList(completedItems, false)}
-        </TabsContent>
-      </Tabs>
-    </div>
+        {/* Active/Completed Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="active" className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Active ({activeItems.length})
+            </TabsTrigger>
+            <TabsTrigger value="completed" className="flex items-center gap-2">
+              <CheckSquare className="h-4 w-4" />
+              Completed ({completedItems.length})
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="active" className="space-y-4">
+            {renderItemsList(activeItems, true)}
+          </TabsContent>
+          
+          <TabsContent value="completed" className="space-y-4">
+            {renderItemsList(completedItems, false)}
+          </TabsContent>
+        </Tabs>
+      </div>
+    </BatchSelectionProvider>
   );
 };
 
