@@ -74,6 +74,10 @@ const MainContent = ({
           onFirefliesTranscriptProcessed={onFirefliesTranscriptProcessed}
           autoSave={appState.autoSave}
           onAutoSaveChange={updateAutoSave}
+          exportState={exportState}
+          importState={importState}
+          clearAllData={clearAllData}
+          lastSaved={appState.lastSaved}
         />
       );
     default:

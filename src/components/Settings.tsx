@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,15 +8,29 @@ import { Switch } from '@/components/ui/switch';
 import { Eye, EyeOff, Save, Key, Trash2, Database } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import FirefliesIntegration from './FirefliesIntegration';
+import StateManager from './StateManager';
 
 interface SettingsProps {
   onApiKeyChange: (apiKey: string) => void;
   onFirefliesTranscriptProcessed: (extractedData: any, transcriptId: string) => void;
   autoSave: boolean;
   onAutoSaveChange: (enabled: boolean) => void;
+  exportState: () => void;
+  importState: (file: File) => void;
+  clearAllData: () => void;
+  lastSaved?: string;
 }
 
-const Settings = ({ onApiKeyChange, onFirefliesTranscriptProcessed, autoSave, onAutoSaveChange }: SettingsProps) => {
+const Settings = ({ 
+  onApiKeyChange, 
+  onFirefliesTranscriptProcessed, 
+  autoSave, 
+  onAutoSaveChange,
+  exportState,
+  importState,
+  clearAllData,
+  lastSaved
+}: SettingsProps) => {
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [apiKeySaved, setApiKeySaved] = useState(false);
@@ -95,6 +110,14 @@ const Settings = ({ onApiKeyChange, onFirefliesTranscriptProcessed, autoSave, on
           </p>
         </CardContent>
       </Card>
+
+      {/* State Management */}
+      <StateManager
+        onExport={exportState}
+        onImport={importState}
+        onClear={clearAllData}
+        lastSaved={lastSaved}
+      />
 
       {/* OpenAI API Key Section */}
       <Card>

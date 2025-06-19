@@ -1,18 +1,18 @@
 import { useState, useRef } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { FileText } from 'lucide-react';
 import ProcessingCard from './ProcessingCard';
 import TranscriptDetailView from './TranscriptDetailView';
 import CollapsibleSection from './CollapsibleSection';
 import SortableItemsList from './SortableItemsList';
 import StatsOverview from './StatsOverview';
 import RecentActivity from './RecentActivity';
-import StateManager from './StateManager';
+import ProcessingIndicator from './dashboard/ProcessingIndicator';
+import ApiKeyWarning from './dashboard/ApiKeyWarning';
+import TodoListSection from './dashboard/TodoListSection';
 import { AppState, ExtractedItem as ExtractedItemType, TranscriptMetadata } from '@/hooks/useUserAppState';
 import { extractItemsFromText, transcribeAudio } from '@/services/openaiService';
-import { CheckSquare, Calendar, Lightbulb, User, FileText, Settings, List } from 'lucide-react';
 import { BatchSelectionProvider } from '@/contexts/BatchSelectionContext';
 
 interface DashboardProps {
@@ -46,7 +46,6 @@ const Dashboard = ({
   addExtractedItems,
   apiKey
 }: DashboardProps) => {
-  const [activeTab, setActiveTab] = useState('all');
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedTranscript, setSelectedTranscript] = useState<string | null>(null);
   const liveRecorderRef = useRef<any>(null);
@@ -310,7 +309,7 @@ const Dashboard = ({
   }
 
   const handleShowAllItems = () => {
-    setActiveTab('all');
+    // This function can be used to navigate to the all items view
   };
 
   // Handle specific views with sorting and category filtering - only show approved items
@@ -376,75 +375,24 @@ const Dashboard = ({
   return (
     <BatchSelectionProvider>
       <div className="p-6 space-y-6">
-        {/* API Key Warning */}
-        {!apiKey && (
-          <Card className="border-yellow-200 bg-yellow-50">
-            <CardContent className="p-4">
-              <p className="text-yellow-800 text-sm">
-                Please configure your OpenAI API key in Settings to enable transcript processing.
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Processing Indicator */}
-        {isProcessing && (
-          <Card className="border-blue-200 bg-blue-50">
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <div className="animate-spin h-4 w-4 border-b-2 border-blue-600 rounded-full"></div>
-                <p className="text-blue-800 text-sm">Processing with OpenAI...</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Stats Overview - show both pending and approved items */}
+        <ApiKeyWarning apiKey={apiKey} />
+        <ProcessingIndicator isProcessing={isProcessing} />
+        
         <StatsOverview
           filteredItems={extractedItems}
           transcriptMetadata={transcriptMetadata}
         />
 
-        {/* State Management */}
-        <CollapsibleSection title="State Management" icon={<Settings className="h-5 w-5 mr-2" />} defaultCollapsed={true}>
-          <StateManager
-            onExport={exportState}
-            onImport={importState}
-            onClear={clearAllData}
-            lastSaved={appState.lastSaved}
-          />
-        </CollapsibleSection>
+        <TodoListSection
+          filteredApprovedItems={filteredApprovedItems}
+          activeCategory={activeCategory}
+          onToggleApproval={toggleItemApproval}
+          onToggleCompletion={toggleItemCompletion}
+          onEdit={editExtractedItem}
+          onDelete={deleteExtractedItem}
+          getTranscriptName={getTranscriptName}
+        />
 
-        {/* To-Do List - Only approved items */}
-        <CollapsibleSection title="To-Do List" icon={<List className="h-5 w-5 mr-2" />} defaultCollapsed={true}>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="all">All Items</TabsTrigger>
-              <TabsTrigger value="task">Tasks</TabsTrigger>
-              <TabsTrigger value="event">Events</TabsTrigger>
-              <TabsTrigger value="idea">Ideas</TabsTrigger>
-              <TabsTrigger value="contact">Contacts</TabsTrigger>
-            </TabsList>
-            
-            {['all', 'task', 'event', 'idea', 'contact'].map((type) => (
-              <TabsContent key={type} value={type} className="space-y-4">
-                <SortableItemsList
-                  items={getApprovedItemsByType(type)}
-                  onToggleApproval={toggleItemApproval}
-                  onToggleCompletion={toggleItemCompletion}
-                  onEdit={editExtractedItem}
-                  onDelete={deleteExtractedItem}
-                  getTranscriptName={getTranscriptName}
-                  type={type}
-                  category={activeCategory}
-                  showPendingItems={false}
-                />
-              </TabsContent>
-            ))}
-          </Tabs>
-        </CollapsibleSection>
-
-        {/* Recent Activity - Updated to show pending items for review and approved for other sections */}
         <RecentActivity
           recentTranscripts={recentTranscripts}
           pendingItems={pendingItems}
@@ -455,7 +403,7 @@ const Dashboard = ({
           onEditItem={editExtractedItem}
           onDeleteItem={deleteExtractedItem}
           getTranscriptName={getTranscriptName}
-          setActiveTab={setActiveTab}
+          setActiveTab={() => {}}
           onShowAllItems={handleShowAllItems}
         />
       </div>
