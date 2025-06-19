@@ -14,8 +14,6 @@ import { AppState, ExtractedItem as ExtractedItemType, TranscriptMetadata } from
 import { extractItemsFromText, transcribeAudio } from '@/services/openaiService';
 import { CheckSquare, Calendar, Lightbulb, User, FileText, Settings, List } from 'lucide-react';
 import { BatchSelectionProvider } from '@/contexts/BatchSelectionContext';
-import BatchOperationsToolbar from './BatchOperationsToolbar';
-import ExtractedItemWithSelection from './ExtractedItemWithSelection';
 
 interface DashboardProps {
   activeCategory?: string;
@@ -55,15 +53,18 @@ const Dashboard = ({
   
   const { transcriptMetadata, extractedItems } = appState;
 
-  // Fix the filtering logic to properly handle categories
-  const filteredItems = activeCategory && activeCategory !== 'all' 
-    ? extractedItems.filter(item => item.category === activeCategory)
-    : extractedItems;
+  // Separate pending and approved items
+  const pendingItems = extractedItems.filter(item => !item.approved);
+  const approvedItems = extractedItems.filter(item => item.approved);
 
-  const getItemsByType = (type: string) => {
-    const baseItems = filteredItems;
-    if (type === 'all') return baseItems;
-    return baseItems.filter(item => item.type === type);
+  // Filter approved items by category for to-do list
+  const filteredApprovedItems = activeCategory && activeCategory !== 'all' 
+    ? approvedItems.filter(item => item.category === activeCategory)
+    : approvedItems;
+
+  const getApprovedItemsByType = (type: string) => {
+    if (type === 'all') return filteredApprovedItems;
+    return filteredApprovedItems.filter(item => item.type === type);
   };
 
   // Handle transcript view details
@@ -290,6 +291,27 @@ const Dashboard = ({
     type: metadata.type,
   }));
 
+  // Handle transcript view details
+  const handleViewTranscriptDetails = (transcriptId: string) => {
+    setSelectedTranscript(transcriptId);
+  };
+
+  // Get items for a specific transcript
+  const getItemsForTranscript = (transcriptId: string) => {
+    return extractedItems.filter(item => item.sourceTranscriptId === transcriptId);
+  };
+
+  // Get transcript by ID
+  const getTranscriptById = (transcriptId: string) => {
+    return transcriptMetadata.find(t => t.id === transcriptId);
+  };
+
+  // Get transcript name
+  const getTranscriptName = (transcriptId: string) => {
+    const transcript = transcriptMetadata.find(t => t.id === transcriptId);
+    return transcript ? transcript.name : 'Unknown Transcript';
+  };
+
   // If viewing transcript details, show detail view
   if (selectedTranscript) {
     const transcript = getTranscriptById(selectedTranscript);
@@ -312,9 +334,9 @@ const Dashboard = ({
     setActiveTab('all');
   };
 
-  // Handle specific views with sorting and category filtering
+  // Handle specific views with sorting and category filtering - only show approved items
   if (activeView === 'task' || activeView === 'event' || activeView === 'idea' || activeView === 'contact') {
-    const items = getItemsByType(activeView);
+    const items = getApprovedItemsByType(activeView);
     return (
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
@@ -334,6 +356,7 @@ const Dashboard = ({
           getTranscriptName={getTranscriptName}
           type={activeView}
           category={activeCategory}
+          showPendingItems={false}
         />
       </div>
     );
@@ -397,9 +420,9 @@ const Dashboard = ({
           </Card>
         )}
 
-        {/* Stats Overview */}
+        {/* Stats Overview - show both pending and approved items */}
         <StatsOverview
-          filteredItems={filteredItems}
+          filteredItems={extractedItems}
           transcriptMetadata={transcriptMetadata}
         />
 
@@ -413,8 +436,8 @@ const Dashboard = ({
           />
         </CollapsibleSection>
 
-        {/* Main Content Tabs */}
-        <CollapsibleSection title="Extracted Items" icon={<List className="h-5 w-5 mr-2" />} defaultCollapsed={true}>
+        {/* To-Do List - Only approved items */}
+        <CollapsibleSection title="To-Do List" icon={<List className="h-5 w-5 mr-2" />} defaultCollapsed={true}>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="all">All Items</TabsTrigger>
@@ -427,7 +450,7 @@ const Dashboard = ({
             {['all', 'task', 'event', 'idea', 'contact'].map((type) => (
               <TabsContent key={type} value={type} className="space-y-4">
                 <SortableItemsList
-                  items={getItemsByType(type)}
+                  items={getApprovedItemsByType(type)}
                   onToggleApproval={toggleItemApproval}
                   onToggleCompletion={toggleItemCompletion}
                   onEdit={editExtractedItem}
@@ -435,16 +458,18 @@ const Dashboard = ({
                   getTranscriptName={getTranscriptName}
                   type={type}
                   category={activeCategory}
+                  showPendingItems={false}
                 />
               </TabsContent>
             ))}
           </Tabs>
         </CollapsibleSection>
 
-        {/* Recent Activity */}
+        {/* Recent Activity - Updated to show pending items for review and approved for other sections */}
         <RecentActivity
           recentTranscripts={recentTranscripts}
-          filteredItems={filteredItems}
+          pendingItems={pendingItems}
+          approvedItems={filteredApprovedItems}
           onViewTranscriptDetails={handleViewTranscriptDetails}
           onToggleApproval={toggleItemApproval}
           onToggleCompletion={toggleItemCompletion}

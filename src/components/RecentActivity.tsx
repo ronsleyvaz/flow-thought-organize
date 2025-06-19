@@ -1,3 +1,4 @@
+
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import CollapsibleSection from './CollapsibleSection';
@@ -17,7 +18,8 @@ interface RecentActivityProps {
     duration: string;
     type: 'meeting' | 'voice-memo' | 'brainstorm';
   }>;
-  filteredItems: ExtractedItemType[];
+  pendingItems: ExtractedItemType[];
+  approvedItems: ExtractedItemType[];
   onViewTranscriptDetails: (id: string) => void;
   onToggleApproval: (id: string) => void;
   onToggleCompletion?: (id: string) => void;
@@ -30,7 +32,8 @@ interface RecentActivityProps {
 
 const RecentActivity = ({
   recentTranscripts,
-  filteredItems,
+  pendingItems,
+  approvedItems,
   onViewTranscriptDetails,
   onToggleApproval,
   onToggleCompletion,
@@ -40,8 +43,6 @@ const RecentActivity = ({
   setActiveTab,
   onShowAllItems
 }: RecentActivityProps) => {
-  const pendingItems = filteredItems.filter(item => !item.approved && !item.completed);
-
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <CollapsibleSection title="Recent Transcripts" icon={<FileText className="h-5 w-5 mr-2" />} defaultCollapsed={true}>
@@ -84,7 +85,7 @@ const RecentActivity = ({
             {pendingItems.length} need review
           </Badge>
           <div className="text-xs text-muted-foreground">
-            Review accuracy, then approve to enable completion
+            Review accuracy, then approve to add to your to-do list
           </div>
         </div>
         {pendingItems.length > 0 ? (
@@ -119,7 +120,7 @@ const RecentActivity = ({
             icon={CheckSquare}
             title="All caught up!"
             description="Great job! All your extracted items have been reviewed and approved."
-            actionLabel="View All Items"
+            actionLabel="View To-Do List"
             onAction={onShowAllItems}
           />
         )}

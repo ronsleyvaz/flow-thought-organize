@@ -1,10 +1,11 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import EmptyState from './EmptyState';
 import { ExtractedItem as ExtractedItemType } from '@/hooks/useUserAppState';
-import { ArrowUpDown, ArrowUp, ArrowDown, CheckSquare, Clock } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, CheckSquare, Clock, AlertCircle } from 'lucide-react';
 import { BatchSelectionProvider } from '@/contexts/BatchSelectionContext';
 import BatchOperationsToolbar from './BatchOperationsToolbar';
 import ExtractedItemWithSelection from './ExtractedItemWithSelection';
@@ -18,6 +19,7 @@ interface SortableItemsListProps {
   getTranscriptName: (id: string) => string;
   type?: string;
   category?: string;
+  showPendingItems?: boolean;
 }
 
 type SortField = 'priority' | 'title' | 'extractedAt' | 'dueDate';
@@ -31,15 +33,17 @@ const SortableItemsList = ({
   onDelete,
   getTranscriptName,
   type = 'all',
-  category
+  category,
+  showPendingItems = true
 }: SortableItemsListProps) => {
   const [sortField, setSortField] = useState<SortField>('extractedAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [activeTab, setActiveTab] = useState('active');
+  const [activeTab, setActiveTab] = useState(showPendingItems ? 'pending' : 'active');
 
-  // Filter items based on completion status
-  const activeItems = items.filter(item => !item.completed);
-  const completedItems = items.filter(item => item.completed);
+  // Filter items based on approval and completion status
+  const pendingItems = items.filter(item => !item.approved);
+  const activeItems = items.filter(item => item.approved && !item.completed);
+  const completedItems = items.filter(item => item.approved && item.completed);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -107,20 +111,31 @@ const SortableItemsList = ({
     }
   };
 
-  const renderItemsList = (itemsToRender: ExtractedItemType[], showCompletionToggle: boolean = false) => {
+  const renderItemsList = (itemsToRender: ExtractedItemType[], showCompletionToggle: boolean = false, isPending: boolean = false) => {
     if (itemsToRender.length === 0) {
-      const emptyMessage = activeTab === 'completed' 
-        ? `No completed ${type === 'all' ? 'items' : `${type}s`}${category ? ` in ${category}` : ''} yet`
-        : `No ${type === 'all' ? 'items' : `${type}s`}${category ? ` in ${category}` : ''} found`;
+      let emptyMessage = '';
+      let emptyDescription = '';
+      let emptyIcon = Clock;
+
+      if (isPending) {
+        emptyMessage = `No ${type === 'all' ? 'items' : `${type}s`}${category ? ` in ${category}` : ''} need review`;
+        emptyDescription = "All items have been reviewed and approved";
+        emptyIcon = CheckSquare;
+      } else if (activeTab === 'completed') {
+        emptyMessage = `No completed ${type === 'all' ? 'items' : `${type}s`}${category ? ` in ${category}` : ''} yet`;
+        emptyDescription = "Complete some items to see them here";
+        emptyIcon = CheckSquare;
+      } else {
+        emptyMessage = `No ${type === 'all' ? 'items' : `${type}s`}${category ? ` in ${category}` : ''} in your to-do list`;
+        emptyDescription = "Approve items from the review section to add them here";
+        emptyIcon = AlertCircle;
+      }
       
       return (
         <EmptyState
-          icon={activeTab === 'completed' ? CheckSquare : Clock}
+          icon={emptyIcon}
           title={emptyMessage}
-          description={activeTab === 'completed' 
-            ? "Complete some items to see them here" 
-            : "Process a transcript to see extracted items here"
-          }
+          description={emptyDescription}
         />
       );
     }
@@ -198,9 +213,15 @@ const SortableItemsList = ({
           </Badge>
         </div>
 
-        {/* Active/Completed Tabs */}
+        {/* Conditional Tabs based on showPendingItems */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className={`grid w-full ${showPendingItems ? 'grid-cols-3' : 'grid-cols-2'}`}>
+            {showPendingItems && (
+              <TabsTrigger value="pending" className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                Pending Review ({pendingItems.length})
+              </TabsTrigger>
+            )}
             <TabsTrigger value="active" className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
               Active ({activeItems.length})
@@ -210,6 +231,12 @@ const SortableItemsList = ({
               Completed ({completedItems.length})
             </TabsTrigger>
           </TabsList>
+          
+          {showPendingItems && (
+            <TabsContent value="pending" className="space-y-4">
+              {renderItemsList(pendingItems, false, true)}
+            </TabsContent>
+          )}
           
           <TabsContent value="active" className="space-y-4">
             {renderItemsList(activeItems, true)}
