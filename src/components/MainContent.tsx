@@ -71,10 +71,7 @@ const MainContent = ({
       return (
         <Settings 
           onApiKeyChange={onApiKeyChange} 
-          appState={appState}
-          exportState={exportState}
-          importState={importState}
-          clearAllData={clearAllData}
+          onFirefliesTranscriptProcessed={onFirefliesTranscriptProcessed}
           autoSave={appState.autoSave}
           onAutoSaveChange={updateAutoSave}
         />
@@ -85,10 +82,15 @@ const MainContent = ({
           activeCategory={activeCategory === 'all' ? undefined : activeCategory}
           activeView={activeView}
           appState={appState}
+          exportState={exportState}
+          importState={importState}
           toggleItemApproval={toggleItemApproval}
           toggleItemCompletion={toggleItemCompletion}
           editExtractedItem={editExtractedItem}
           deleteExtractedItem={deleteExtractedItem}
+          clearAllData={clearAllData}
+          addProcessedTranscript={addProcessedTranscript}
+          addExtractedItems={addExtractedItems}
           apiKey={apiKey}
         />
       );
