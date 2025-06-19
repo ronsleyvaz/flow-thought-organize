@@ -291,27 +291,6 @@ const Dashboard = ({
     type: metadata.type,
   }));
 
-  // Handle transcript view details
-  const handleViewTranscriptDetails = (transcriptId: string) => {
-    setSelectedTranscript(transcriptId);
-  };
-
-  // Get items for a specific transcript
-  const getItemsForTranscript = (transcriptId: string) => {
-    return extractedItems.filter(item => item.sourceTranscriptId === transcriptId);
-  };
-
-  // Get transcript by ID
-  const getTranscriptById = (transcriptId: string) => {
-    return transcriptMetadata.find(t => t.id === transcriptId);
-  };
-
-  // Get transcript name
-  const getTranscriptName = (transcriptId: string) => {
-    const transcript = transcriptMetadata.find(t => t.id === transcriptId);
-    return transcript ? transcript.name : 'Unknown Transcript';
-  };
-
   // If viewing transcript details, show detail view
   if (selectedTranscript) {
     const transcript = getTranscriptById(selectedTranscript);
